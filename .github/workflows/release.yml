@@ -13,23 +13,46 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
             artifact_name: wgit
             asset_name: wgit-linux-amd64
           - os: windows-latest
+            target: x86_64-pc-windows-msvc
             artifact_name: wgit.exe
             asset_name: wgit-windows-amd64.exe
           - os: macos-latest
+            target: x86_64-apple-darwin
             artifact_name: wgit
             asset_name: wgit-macos-amd64
 
     steps:
       - uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install MUSL Tools (Linux only)
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get install -y musl-tools
+
       - name: Build
-        run: cargo build --release
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Prepare Binary Path
+        shell: bash
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            echo "BIN_PATH=target/${{ matrix.target }}/release/${{ matrix.artifact_name }}" >> $GITHUB_ENV
+          else
+            echo "BIN_PATH=target/${{ matrix.target }}/release/${{ matrix.artifact_name }}" >> $GITHUB_ENV
+          fi
+
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/release/${{ matrix.artifact_name }}
+          file: ${{ env.BIN_PATH }}
           asset_name: ${{ matrix.asset_name }}
           tag: ${{ github.ref }}
