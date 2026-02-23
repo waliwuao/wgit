@@ -7,27 +7,28 @@ pub struct Cli {
     pub command: Option<SubCommand>,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 pub enum SubCommand {
-    Init,
     Add,
-    Commit,
+    Init,
     Sync,
-    Branch(BranchArgs),
     Undo,
+    Exit,
     Config,
+    Branch(BranchArgs),
+    Commit,
 }
 
-#[derive(Parser)]
+#[derive(Parser, Debug)]
 pub struct BranchArgs {
     #[command(subcommand)]
     pub action: Option<BranchAction>,
 }
 
-#[derive(Subcommand, Clone)]
+#[derive(Subcommand, Clone, Debug)]
 pub enum BranchAction {
-    Switch,
-    Delete,
     Start,
+    Delete,
+    Switch,
     Finish,
 }

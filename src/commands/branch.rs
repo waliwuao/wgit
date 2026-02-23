@@ -12,9 +12,9 @@ pub fn run(args: BranchArgs) -> anyhow::Result<()> {
     };
 
     match action {
-        BranchAction::Switch => switch()?,
-        BranchAction::Delete => delete()?,
         BranchAction::Start => start()?,
+        BranchAction::Delete => delete()?,
+        BranchAction::Switch => switch()?,
         BranchAction::Finish => finish()?,
     }
     Ok(())
@@ -22,9 +22,9 @@ pub fn run(args: BranchArgs) -> anyhow::Result<()> {
 
 fn interactive_select() -> anyhow::Result<BranchAction> {
     let actions = vec![
-        format!("{:<14} {}", "Switch", "Checkout an existing branch from the local list".bright_black()),
-        format!("{:<14} {}", "Delete", "Remove a redundant branch (protected branches excluded)".bright_black()),
         format!("{:<14} {}", "Start", "Create a standardized feature or hotfix branch".bright_black()),
+        format!("{:<14} {}", "Delete", "Remove a redundant branch (protected branches excluded)".bright_black()),
+        format!("{:<14} {}", "Switch", "Checkout an existing branch from the local list".bright_black()),
         format!("{:<14} {}", "Finish", "Merge current branch into target and clean up".bright_black()),
     ];
 
@@ -36,9 +36,9 @@ fn interactive_select() -> anyhow::Result<BranchAction> {
     let action_str = choice.split_whitespace().next().unwrap_or("");
     
     match action_str {
-        "Switch" => Ok(BranchAction::Switch),
-        "Delete" => Ok(BranchAction::Delete),
         "Start" => Ok(BranchAction::Start),
+        "Delete" => Ok(BranchAction::Delete),
+        "Switch" => Ok(BranchAction::Switch),
         "Finish" => Ok(BranchAction::Finish),
         _ => anyhow::bail!("Invalid branch action selected"),
     }

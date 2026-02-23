@@ -29,9 +29,9 @@ pub fn run() -> anyhow::Result<()> {
     let hash = selected.split_whitespace().next().unwrap();
 
     let modes = vec![
+        format!("{:<14} {}", "--hard", "Discard all changes completely (Caution!)".bright_black()),
         format!("{:<14} {}", "--soft", "Keep all changes in staging area".bright_black()),
         format!("{:<14} {}", "--mixed", "Keep all changes in working directory (Default)".bright_black()),
-        format!("{:<14} {}", "--hard", "Discard all changes completely (Caution!)".bright_black())
     ];
     let mode_choice = Select::new("Select reset mode:", modes)
         .with_render_config(get_theme())
