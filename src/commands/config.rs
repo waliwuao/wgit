@@ -1,5 +1,6 @@
 use crate::git;
 use crate::config::{load_config, save_config, ReviewMode};
+use crate::utils::get_theme;
 use inquire::{Select, Text};
 
 pub fn run() -> anyhow::Result<()> {
@@ -12,12 +13,18 @@ pub fn run() -> anyhow::Result<()> {
     ];
 
     loop {
-        let choice = Select::new("Wgit Config Menu:", options.clone()).prompt()?;
+        let choice = Select::new("Wgit Config Menu:", options.clone())
+            .with_render_config(get_theme())
+            .prompt()?;
         
         match choice {
             "Add remote repo" => {
-                let name = Text::new("Remote name (e.g., origin):").prompt()?;
-                let url = Text::new("Remote URL:").prompt()?;
+                let name = Text::new("Remote name (e.g., origin):")
+                    .with_render_config(get_theme())
+                    .prompt()?;
+                let url = Text::new("Remote URL:")
+                    .with_render_config(get_theme())
+                    .prompt()?;
                 
                 let _ = git::get_output(&["remote", "add", &name, &url]);
                 config.remotes.insert(name.clone(), url.clone());
@@ -29,7 +36,9 @@ pub fn run() -> anyhow::Result<()> {
                     "LocalMerge (Merge locally when finishing branches)", 
                     "RemoteReview (Push branch after commit for remote review)"
                 ];
-                let m = Select::new("Select review mode:", modes).prompt()?;
+                let m = Select::new("Select review mode:", modes)
+                    .with_render_config(get_theme())
+                    .prompt()?;
                 
                 if m.starts_with("LocalMerge") {
                     config.review_mode = ReviewMode::LocalMerge;

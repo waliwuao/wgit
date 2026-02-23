@@ -1,5 +1,6 @@
 use crate::git;
 use crate::config::load_config;
+use crate::utils::get_theme;
 use inquire::Select;
 
 pub fn run() -> anyhow::Result<()> {
@@ -12,7 +13,9 @@ pub fn run() -> anyhow::Result<()> {
         config.remotes.keys().next().unwrap().clone()
     } else {
         let remotes: Vec<_> = config.remotes.keys().cloned().collect();
-        Select::new("Select remote to sync:", remotes).prompt()?
+        Select::new("Select remote to sync:", remotes)
+            .with_render_config(get_theme())
+            .prompt()?
     };
 
     let current_branch = git::get_output(&["rev-parse", "--abbrev-ref", "HEAD"])?;

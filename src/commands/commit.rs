@@ -1,11 +1,15 @@
 use crate::git;
 use crate::config::{load_config, ReviewMode};
+use crate::utils::get_theme;
 use inquire::Select;
 
 pub fn run() -> anyhow::Result<()> {
     let types = vec!["feat", "fix", "docs", "style", "refactor", "perf", "test", "chore"];
-    let commit_type = Select::new("Select commit type:", types).prompt()?;
+    let commit_type = Select::new("Select commit type:", types)
+        .with_render_config(get_theme())
+        .prompt()?;
 
+    // 显式指定类型以避免因模块加载顺序或推断失败导致的 E0282 错误
     let (scope, subject, body): (String, String, String) = crate::utils::run_commit_form()?;
 
     if subject.trim().is_empty() {
@@ -37,7 +41,9 @@ pub fn run() -> anyhow::Result<()> {
                 config.remotes.keys().next().unwrap().clone()
             } else {
                 let remotes: Vec<_> = config.remotes.keys().cloned().collect();
-                Select::new("Select remote to push:", remotes).prompt()?
+                Select::new("Select remote to push:", remotes)
+                    .with_render_config(get_theme())
+                    .prompt()?
             };
             git::run_git(&["push", "-u", &remote, &current_branch])?;
         }

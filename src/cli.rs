@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand};
 #[command(name = "wgit", version, about = "A customized git flow wrapper")]
 pub struct Cli {
     #[command(subcommand)]
-    pub command: SubCommand,
+    pub command: Option<SubCommand>,
 }
 
 #[derive(Subcommand)]

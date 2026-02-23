@@ -1,4 +1,5 @@
 use crate::git;
+use crate::utils::get_theme;
 use inquire::MultiSelect;
 
 pub fn run() -> anyhow::Result<()> {
@@ -18,7 +19,9 @@ pub fn run() -> anyhow::Result<()> {
     let selected_files = MultiSelect::new(
         "Select files to add (Space: select, Enter: confirm, 'a': toggle all):", 
         files
-    ).prompt()?;
+    )
+    .with_render_config(get_theme())
+    .prompt()?;
 
     if selected_files.is_empty() {
         println!("No files selected.");

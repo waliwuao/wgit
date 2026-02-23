@@ -1,4 +1,5 @@
 use crate::git;
+use crate::utils::get_theme;
 use inquire::Select;
 
 pub fn run() -> anyhow::Result<()> {
@@ -6,7 +7,9 @@ pub fn run() -> anyhow::Result<()> {
         "Undo by Commit (git log)", 
         "Undo by Operation (git reflog)"
     ];
-    let choice = Select::new("Select undo method:", options).prompt()?;
+    let choice = Select::new("Select undo method:", options)
+        .with_render_config(get_theme())
+        .prompt()?;
 
     let lines = if choice.contains("log") {
         git::get_output(&["log", "--oneline", "-n", "20"])?
@@ -19,7 +22,9 @@ pub fn run() -> anyhow::Result<()> {
         anyhow::bail!("No history found.");
     }
 
-    let selected = Select::new("Select target point to reset to:", log_lines).prompt()?;
+    let selected = Select::new("Select target point to reset to:", log_lines)
+        .with_render_config(get_theme())
+        .prompt()?;
     let hash = selected.split_whitespace().next().unwrap();
 
     let modes = vec![
@@ -27,7 +32,9 @@ pub fn run() -> anyhow::Result<()> {
         "--mixed (Keep changes in working directory)", 
         "--hard (Discard all changes completely)"
     ];
-    let mode_choice = Select::new("Select reset mode:", modes).prompt()?;
+    let mode_choice = Select::new("Select reset mode:", modes)
+        .with_render_config(get_theme())
+        .prompt()?;
     let mode = mode_choice.split_whitespace().next().unwrap();
 
     git::run_git(&["reset", mode, hash])?;

@@ -2,10 +2,23 @@ use crossterm::{
     cursor,
     event::{self, Event, KeyCode, KeyModifiers},
     queue,
-    style::{Color, Print, ResetColor, SetForegroundColor},
+    style::{Color as CrossColor, Print, ResetColor, SetForegroundColor},
     terminal::{self, ClearType},
 };
 use std::io::{stdout, Write};
+
+pub fn get_theme() -> inquire::ui::RenderConfig<'static> {
+    use inquire::ui::{Color, RenderConfig, StyleSheet, Styled};
+
+    let selected_style = StyleSheet::new().with_fg(Color::LightBlue);
+    
+    RenderConfig::default()
+        .with_selected_option(Some(selected_style))
+        .with_selected_checkbox(Styled::new("☑").with_fg(Color::LightBlue))
+        .with_scroll_up_prefix(Styled::new("▲").with_fg(Color::LightBlue))
+        .with_scroll_down_prefix(Styled::new("▼").with_fg(Color::LightBlue))
+        .with_prompt_prefix(Styled::new("?").with_fg(Color::LightGreen))
+}
 
 struct RawModeGuard;
 
@@ -45,7 +58,7 @@ pub fn run_commit_form() -> anyhow::Result<(String, String, String)> {
 
         for i in 0..3 {
             if i == active {
-                queue!(stdout, SetForegroundColor(Color::Green), Print("> "), ResetColor)?;
+                queue!(stdout, SetForegroundColor(CrossColor::Green), Print("> "), ResetColor)?;
             } else {
                 queue!(stdout, Print("  "))?;
             }
