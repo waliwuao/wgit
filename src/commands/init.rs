@@ -1,7 +1,7 @@
 use crate::git;
 
 pub fn run() -> anyhow::Result<()> {
-    git::run_git(&["init"])?;
+    git::run_git(&["init", "--initial-branch=main"])?;
 
     if git::get_output(&["rev-parse", "HEAD"]).is_err() {
         git::run_git(&["commit", "--allow-empty", "-m", "chore: initial wgit commit"])?;

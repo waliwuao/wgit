@@ -21,10 +21,10 @@ pub enum SubCommand {
 #[derive(Parser)]
 pub struct BranchArgs {
     #[command(subcommand)]
-    pub action: BranchAction,
+    pub action: Option<BranchAction>,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Clone)]
 pub enum BranchAction {
     Switch,
     Delete,
