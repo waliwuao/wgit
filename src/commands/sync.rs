@@ -6,7 +6,7 @@ use inquire::Select;
 pub fn run() -> anyhow::Result<()> {
     let config = load_config()?;
     if config.remotes.is_empty() {
-        anyhow::bail!("No remotes configured in wgit. Please run `wgit config` to add a remote url.");
+        anyhow::bail!("No remotes configured. Please run `wgit config` to add a remote url.");
     }
 
     let remote_name = if config.remotes.len() == 1 {
@@ -18,12 +18,18 @@ pub fn run() -> anyhow::Result<()> {
             .prompt()?
     };
 
+    let remote_main_check = git::get_output(&["ls-remote", "--heads", &remote_name, "main"])?;
+    if !remote_main_check.contains("refs/heads/main") {
+        println!("Detected new remote. Pushing 'main' branch first to ensure it is the default branch...");
+        let _ = git::run_git(&["push", "-u", &remote_name, "main"]);
+    }
+
     let current_branch = git::get_output(&["rev-parse", "--abbrev-ref", "HEAD"])?;
 
-    println!("Intelligently syncing branch: {} with remote: {}", current_branch, remote_name);
+    println!("Syncing branch: {} with remote: {}", current_branch, remote_name);
     
     let _ = git::run_git(&["pull", &remote_name, &current_branch]);
-    git::run_git(&["push", &remote_name, &current_branch])?;
+    git::run_git(&["push", "-u", &remote_name, &current_branch])?;
 
     Ok(())
 }
