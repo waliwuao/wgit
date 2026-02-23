@@ -22,10 +22,10 @@ pub fn run(args: BranchArgs) -> anyhow::Result<()> {
 
 fn interactive_select() -> anyhow::Result<BranchAction> {
     let actions = vec![
-        format!("{:<7} {}", "Switch", "- Switch to another branch".bright_black()),
-        format!("{:<7} {}", "Delete", "- Delete a branch".bright_black()),
-        format!("{:<7} {}", "Start", "- Create a new feature/hotfix branch".bright_black()),
-        format!("{:<7} {}", "Finish", "- Merge current branch into develop/main".bright_black()),
+        format!("{:<14} {}", "Switch", "Checkout an existing branch from the local list".bright_black()),
+        format!("{:<14} {}", "Delete", "Remove a redundant branch (protected branches excluded)".bright_black()),
+        format!("{:<14} {}", "Start", "Create a standardized feature or hotfix branch".bright_black()),
+        format!("{:<14} {}", "Finish", "Merge current branch into target and clean up".bright_black()),
     ];
 
     let choice = Select::new("Select branch action:", actions)
@@ -51,7 +51,7 @@ fn get_branches() -> anyhow::Result<Vec<String>> {
 
 fn switch() -> anyhow::Result<()> {
     let branches = get_branches()?;
-    let branch = Select::new("Select branch to switch to:", branches)
+    let branch = Select::new("Select target branch:", branches)
         .with_render_config(get_theme())
         .with_page_size(10)
         .prompt()?;
@@ -67,10 +67,10 @@ fn delete() -> anyhow::Result<()> {
         .collect();
     
     if filter_branches.is_empty() {
-        anyhow::bail!("No deletable branches available.");
+        anyhow::bail!("No deletable branches found.");
     }
 
-    let branch = Select::new("Select branch to delete:", filter_branches)
+    let branch = Select::new("Select branch to remove:", filter_branches)
         .with_render_config(get_theme())
         .with_page_size(10)
         .prompt()?;
@@ -80,7 +80,7 @@ fn delete() -> anyhow::Result<()> {
 
 fn start() -> anyhow::Result<()> {
     let types = vec!["feature", "bugfix", "release", "hotfix"];
-    let branch_type = Select::new("Select branch type:", types)
+    let branch_type = Select::new("Select branch category:", types)
         .with_render_config(get_theme())
         .prompt()?;
     
@@ -95,21 +95,21 @@ fn start() -> anyhow::Result<()> {
 
 fn finish() -> anyhow::Result<()> {
     let config = load_config()?;
-    let current = git::get_output(&["rev-parse", "--abbrev-ref", "HEAD"])?;
+    let current = git::get_output(&["rev-parse", "--abbrev-ref", "HEAD"])?.trim().to_string();
+    
     if current == config.main_branch || current == config.dev_branch {
-        anyhow::bail!("Cannot finish main or develop branches.");
+        anyhow::bail!("Operation denied: Cannot finish a protected branch.");
     }
 
-    println!("Preparing merge commit message...");
     let types = vec!["merge", "feat", "fix", "chore", "release", "docs", "style", "refactor", "perf", "test"];
-    let commit_type = Select::new("Select merge commit type:", types)
+    let commit_type = Select::new("Select merge type:", types)
         .with_render_config(get_theme())
         .prompt()?;
 
     let (scope, subject, body) = run_commit_form()?;
 
     if subject.trim().is_empty() {
-        anyhow::bail!("Subject cannot be empty");
+        anyhow::bail!("Required field 'Subject' is empty.");
     }
 
     let mut msg = format!("{commit_type}");
@@ -123,22 +123,34 @@ fn finish() -> anyhow::Result<()> {
         msg.push_str(body.trim());
     }
 
+    println!("\n{}", "── Finishing Branch ────────────────────────────────────────────────────".cyan());
+
     if current.starts_with("release/") || current.starts_with("hotfix/") {
+        println!("{} Merging into {}...", " 1/3 ".on_cyan().black(), config.main_branch);
         git::run_git(&["checkout", &config.main_branch])?;
         git::run_git(&["merge", "--no-ff", &current, "-m", &msg])?;
 
-        let tag = Text::new("Enter release tag (e.g., v1.0.0):")
+        let tag = Text::new("Assign version tag (e.g. v1.0.0):")
             .with_render_config(get_theme())
             .prompt()?;
-        git::run_git(&["tag", &tag])?;
+        
+        if !tag.trim().is_empty() {
+            git::run_git(&["tag", "-a", tag.trim(), "-m", &msg])?;
+        }
 
+        println!("{} Merging into {}...", " 2/3 ".on_cyan().black(), config.dev_branch);
         git::run_git(&["checkout", &config.dev_branch])?;
         git::run_git(&["merge", "--no-ff", &current, "-m", &msg])?;
     } else {
+        println!("{} Merging into {}...", " 1/2 ".on_cyan().black(), config.dev_branch);
         git::run_git(&["checkout", &config.dev_branch])?;
         git::run_git(&["merge", "--no-ff", &current, "-m", &msg])?;
     }
 
-    println!("Branch {} finished successfully.", current);
+    let cleanup_step = if current.starts_with("release/") || current.starts_with("hotfix/") { " 3/3 " } else { " 2/2 " };
+    println!("{} Cleaning up branch...", cleanup_step.on_cyan().black());
+    git::run_git(&["branch", "-d", &current])?;
+
+    println!("{}\n", format!("Successfully finished branch: {}", current).green().bold());
     Ok(())
 }

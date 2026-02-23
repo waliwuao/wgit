@@ -13,11 +13,29 @@ use colored::Colorize;
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
-    let command = match cli.command {
-        Some(cmd) => cmd,
-        None => interactive_select()?,
-    };
+    match cli.command {
+        Some(cmd) => execute_command(cmd)?,
+        None => {
+            loop {
+                match interactive_select()? {
+                    Some(cmd) => {
+                        if let Err(e) = execute_command(cmd) {
+                            println!("{} {}", "Error:".red().bold(), e);
+                            println!("{}", "Press Enter to continue...".bright_black());
+                            let _ = std::io::stdin().read_line(&mut String::new());
+                        }
+                        println!("\n"); 
+                    },
+                    None => break, 
+                }
+            }
+        }
+    }
 
+    Ok(())
+}
+
+fn execute_command(command: SubCommand) -> anyhow::Result<()> {
     match command {
         SubCommand::Init => commands::init::run()?,
         SubCommand::Add => commands::add::run()?,
@@ -27,36 +45,42 @@ fn main() -> anyhow::Result<()> {
         SubCommand::Undo => commands::undo::run()?,
         SubCommand::Config => commands::config::run()?,
     }
-
     Ok(())
 }
 
-fn interactive_select() -> anyhow::Result<SubCommand> {
+fn interactive_select() -> anyhow::Result<Option<SubCommand>> {
     let options = vec![
-        format!("{:<7} {}", "Init", "- Initialize git flow".bright_black()),
-        format!("{:<7} {}", "Add", "- Interactive add files".bright_black()),
-        format!("{:<7} {}", "Commit", "- Interactive commit".bright_black()),
-        format!("{:<7} {}", "Sync", "- Smart pull & push".bright_black()),
-        format!("{:<7} {}", "Branch", "- Manage branches (Switch/Delete/Start/Finish)".bright_black()),
-        format!("{:<7} {}", "Undo", "- Undo recent changes".bright_black()),
-        format!("{:<7} {}", "Config", "- Configure wgit settings".bright_black()),
+        format!("{:<14} {}", "Init", "Initialize git-flow environment and branch protection".bright_black()),
+        format!("{:<14} {}", "Add", "Interactively stage modified or untracked files".bright_black()),
+        format!("{:<14} {}", "Commit", "Record repository changes with structured messages".bright_black()),
+        format!("{:<14} {}", "Sync", "Synchronize current branch with remote (Pull & Push)".bright_black()),
+        format!("{:<14} {}", "Branch", "Manage development lifecycle and branch operations".bright_black()),
+        format!("{:<14} {}", "Undo", "Revert changes to a specific commit or operation".bright_black()),
+        format!("{:<14} {}", "Config", "Manage remote repositories and workflow preferences".bright_black()),
+        format!("{:<14} {}", "Exit", "Close wgit assistant".bright_black()),
     ];
 
-    let choice = Select::new("Select a command to run (Esc to Exit):", options)
+    let choice = Select::new("Wgit Assistant Menu:", options)
         .with_render_config(get_theme())
-        .with_page_size(10) // 扩大展示数量，避免翻页
-        .prompt()?;
+        .with_page_size(10)
+        .prompt_skippable()?;
     
+    let choice = match choice {
+        Some(c) => c,
+        None => return Ok(None),
+        };
+
     let cmd_str = choice.split_whitespace().next().unwrap_or("");
 
     match cmd_str {
-        "Init" => Ok(SubCommand::Init),
-        "Add" => Ok(SubCommand::Add),
-        "Commit" => Ok(SubCommand::Commit),
-        "Sync" => Ok(SubCommand::Sync),
-        "Branch" => Ok(SubCommand::Branch(BranchArgs { action: None })), // 传入 None，让 Branch 命令自己处理交互
-        "Undo" => Ok(SubCommand::Undo),
-        "Config" => Ok(SubCommand::Config),
+        "Init" => Ok(Some(SubCommand::Init)),
+        "Add" => Ok(Some(SubCommand::Add)),
+        "Commit" => Ok(Some(SubCommand::Commit)),
+        "Sync" => Ok(Some(SubCommand::Sync)),
+        "Branch" => Ok(Some(SubCommand::Branch(BranchArgs { action: None }))),
+        "Undo" => Ok(Some(SubCommand::Undo)),
+        "Config" => Ok(Some(SubCommand::Config)),
+        "Exit" => Ok(None),
         _ => anyhow::bail!("Invalid command selected"),
     }
 }

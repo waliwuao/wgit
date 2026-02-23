@@ -3,17 +3,23 @@ use colored::*;
 use anyhow::{Result, Context};
 
 pub fn run_git(args: &[&str]) -> Result<()> {
-    println!("{}", format!("> git {}", args.join(" ")).bright_cyan());
+    let cmd_display = format!("  git {}", args.join(" ")).bright_black();
+    println!("{}", cmd_display);
     
-    let status = Command::new("git")
+    let output = Command::new("git")
         .args(args)
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .status()
-        .context("Failed to execute git command")?;
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .context("Failed to execute git command")?
+        .wait_with_output()?;
 
-    if !status.success() {
-        anyhow::bail!("Git command failed with status: {}", status);
+    if !output.status.success() {
+        println!("{}", "── Git Error ───────────────────────────────────────────────────────────".red());
+        let err = String::from_utf8_lossy(&output.stderr);
+        println!("{}", err.trim());
+        println!("{}", "────────────────────────────────────────────────────────────────────────".red());
+        anyhow::bail!("Git execution failed.");
     }
     Ok(())
 }

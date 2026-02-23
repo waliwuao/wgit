@@ -1,17 +1,18 @@
 use crate::git;
 use crate::utils::get_theme;
 use inquire::Select;
+use colored::Colorize;
 
 pub fn run() -> anyhow::Result<()> {
     let options = vec![
-        "Undo by Commit (git log)", 
-        "Undo by Operation (git reflog)"
+        format!("{:<14} {}", "Commit", "Undo changes by selecting a point from git log".bright_black()),
+        format!("{:<14} {}", "Operation", "Undo changes by selecting an action from git reflog".bright_black())
     ];
     let choice = Select::new("Select undo method:", options)
         .with_render_config(get_theme())
         .prompt()?;
 
-    let lines = if choice.contains("log") {
+    let lines = if choice.contains("Commit") {
         git::get_output(&["log", "--oneline", "-n", "20"])?
     } else {
         git::get_output(&["reflog", "-n", "20"])?
@@ -28,9 +29,9 @@ pub fn run() -> anyhow::Result<()> {
     let hash = selected.split_whitespace().next().unwrap();
 
     let modes = vec![
-        "--soft (Keep changes in staging)", 
-        "--mixed (Keep changes in working directory)", 
-        "--hard (Discard all changes completely)"
+        format!("{:<14} {}", "--soft", "Keep all changes in staging area".bright_black()),
+        format!("{:<14} {}", "--mixed", "Keep all changes in working directory (Default)".bright_black()),
+        format!("{:<14} {}", "--hard", "Discard all changes completely (Caution!)".bright_black())
     ];
     let mode_choice = Select::new("Select reset mode:", modes)
         .with_render_config(get_theme())

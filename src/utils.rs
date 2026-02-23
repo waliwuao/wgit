@@ -46,68 +46,132 @@ pub fn run_commit_form() -> anyhow::Result<(String, String, String)> {
     let mut scope = String::new();
     let mut subject = String::new();
     let mut body = String::new();
-    let mut active = 0; 
+    let mut active = 1; 
 
     loop {
         queue!(stdout, terminal::Clear(ClearType::All), cursor::MoveTo(0, 0))?;
         queue!(
             stdout,
-            Print("=== Commit Form ===\n\r"),
-            Print("Use [Up/Down] to switch fields. Select < SUBMIT > and press [Enter] to commit.\n\r"),
-            Print("Press [Esc] to Abort.\n\r\n\r")
+            SetForegroundColor(CrossColor::DarkGrey),
+            Print("─".repeat(80)),
+            Print("\n\r"),
+            ResetColor,
+            SetAttribute(Attribute::Bold),
+            Print("  STRUCTURED COMMIT EDITOR"),
+            SetAttribute(Attribute::Reset),
+            Print("\n\r"),
+            SetForegroundColor(CrossColor::DarkGrey),
+            Print("─".repeat(80)),
+            Print("\n\r\n\r"),
+            ResetColor
         )?;
 
-        let labels = ["< SUBMIT >", "Scope (opt): ", "Subject:     ", "Body (opt):  "];
-        let values = ["", &scope, &subject, &body];
+        let fields = [
+            ("SUBMIT", ""),
+            ("SCOPE", "Optional context"),
+            ("SUBJECT", "Brief summary"),
+            ("BODY", "Detailed motivation"),
+        ];
 
-        for i in 0..4 {
-            if i == active {
-                queue!(stdout, SetForegroundColor(CrossColor::Green), Print("> "), ResetColor)?;
-                if i == 0 {
-                    queue!(stdout, SetAttribute(Attribute::Reverse), Print(labels[i]), SetAttribute(Attribute::Reset))?;
-                } else {
-                    queue!(stdout, Print(labels[i]))?;
-                }
+        for i in 1..4 {
+            let is_active = active == i;
+            let label = fields[i].0;
+            let hint = fields[i].1;
+            let val = match i {
+                1 => &scope,
+                2 => &subject,
+                3 => &body,
+                _ => "",
+            };
+
+            if is_active {
+                queue!(stdout, SetForegroundColor(CrossColor::Cyan), Print(" ● "), ResetColor)?;
             } else {
-                queue!(stdout, Print("  "), Print(labels[i]))?;
+                queue!(stdout, Print("   "))?;
             }
 
-            if i > 0 {
-                if i == 3 { 
-                    // Body handling
-                    let lines: Vec<&str> = values[i].split('\n').collect();
-                    for (j, line) in lines.iter().enumerate() {
-                        if j > 0 {
-                            queue!(stdout, Print("\n\r"), Print("               "))?;
-                        }
+            queue!(
+                stdout,
+                SetAttribute(Attribute::Bold),
+                Print(format!("{:<10} ", label)),
+                SetAttribute(Attribute::Reset),
+                SetForegroundColor(CrossColor::DarkGrey),
+                Print("│ "),
+                ResetColor
+            )?;
+
+            if i == 3 {
+                let lines: Vec<&str> = val.split('\n').collect();
+                for (idx, line) in lines.iter().enumerate() {
+                    if idx > 0 {
+                        queue!(stdout, Print("\n\r             "), SetForegroundColor(CrossColor::DarkGrey), Print("│ "), ResetColor)?;
+                    }
+                    if is_active && idx == lines.len() - 1 {
+                        queue!(stdout, SetForegroundColor(CrossColor::White), Print(line), Print("█"), ResetColor)?;
+                    } else {
                         queue!(stdout, Print(line))?;
                     }
-                    queue!(stdout, Print("\n\r"))?;
-                } else {
-                    queue!(stdout, Print(values[i]), Print("\n\r"))?;
+                }
+                if is_active {
+                    queue!(stdout, Print("\n\r             "), SetForegroundColor(CrossColor::DarkGrey), Print("└─ "), Print(hint), ResetColor)?;
                 }
             } else {
-                queue!(stdout, Print("\n\r"))?;
+                if is_active {
+                    queue!(stdout, SetForegroundColor(CrossColor::White), Print(val), Print("█"), ResetColor, Print("  "), SetForegroundColor(CrossColor::DarkGrey), Print("// "), Print(hint), ResetColor)?;
+                } else {
+                    queue!(stdout, Print(val))?;
+                }
             }
+            queue!(stdout, Print("\n\r\n\r"))?;
         }
+
+        queue!(stdout, Print("\n\r"))?;
+        if active == 0 {
+            queue!(stdout, SetForegroundColor(CrossColor::Green), SetAttribute(Attribute::Reverse), Print("    [ CONFIRM AND COMMIT ]    "), SetAttribute(Attribute::Reset), ResetColor)?;
+        } else {
+            queue!(stdout, SetForegroundColor(CrossColor::DarkGrey), Print("    [ CONFIRM AND COMMIT ]    "), ResetColor)?;
+        }
+        queue!(stdout, Print("\n\r\n\r"))?;
+
+        queue!(
+            stdout,
+            SetForegroundColor(CrossColor::DarkGrey),
+            Print("─".repeat(80)),
+            Print("\n\r"),
+            Print("  ↑/↓: Navigate • Enter: Next Field (Body: Newline) • Esc: Abort"),
+            Print("\n\r"),
+            Print("─".repeat(80)),
+            ResetColor
+        )?;
+
         stdout.flush()?;
 
         if let Event::Key(key_event) = event::read()? {
             match key_event.code {
                 KeyCode::Up => {
-                    if active > 0 { active -= 1; }
+                    active = match active {
+                        1 => 0,
+                        2 => 1,
+                        3 => 2,
+                        0 => 3,
+                        _ => 1,
+                    };
                 }
                 KeyCode::Down => {
-                    if active < 3 { active += 1; }
+                    active = match active {
+                        1 => 2,
+                        2 => 3,
+                        3 => 0,
+                        0 => 1,
+                        _ => 1,
+                    };
                 }
                 KeyCode::Enter => {
-                    if active == 0 {
-                        // Submit
-                        break;
-                    } else if active == 3 {
-                        body.push('\n');
-                    } else { 
-                        active += 1; 
+                    match active {
+                        0 => break,
+                        1 | 2 => active += 1,
+                        3 => body.push('\n'),
+                        _ => {}
                     }
                 }
                 KeyCode::Backspace => {
@@ -127,7 +191,7 @@ pub fn run_commit_form() -> anyhow::Result<(String, String, String)> {
                     }
                 }
                 KeyCode::Esc => {
-                    return Err(anyhow::anyhow!("Commit form aborted by user."));
+                    return Err(anyhow::anyhow!("Operation aborted."));
                 }
                 _ => {}
             }

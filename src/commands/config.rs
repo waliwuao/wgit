@@ -8,8 +8,8 @@ pub fn run() -> anyhow::Result<()> {
 
     let options = vec![
         "Add remote repo", 
-        "Set review mode (Local Merge vs Remote Review)", 
-        "Set branch names (main/develop)",
+        "Set review mode ", 
+        "Set branch names",
         "Exit"
     ];
 
