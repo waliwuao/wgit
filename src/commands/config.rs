@@ -9,6 +9,7 @@ pub fn run() -> anyhow::Result<()> {
     let options = vec![
         "Add remote repo", 
         "Set review mode (Local Merge vs Remote Review)", 
+        "Set branch names (main/develop)",
         "Exit"
     ];
 
@@ -47,6 +48,21 @@ pub fn run() -> anyhow::Result<()> {
                 }
                 save_config(&config)?;
                 println!("Review mode updated successfully.");
+            }
+            "Set branch names (main/develop)" => {
+                let m = Text::new("Main branch name:")
+                    .with_initial_value(&config.main_branch)
+                    .prompt()?;
+                let d = Text::new("Develop branch name:")
+                    .with_initial_value(&config.dev_branch)
+                    .prompt()?;
+                
+                config.main_branch = m;
+                config.dev_branch = d;
+                save_config(&config)?;
+                
+                crate::commands::init::install_hook(&config.main_branch, &config.dev_branch)?;
+                println!("Branch names updated and hooks refreshed.");
             }
             _ => break,
         }

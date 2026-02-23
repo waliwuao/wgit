@@ -1,35 +1,39 @@
 use crate::git;
+use crate::config::load_config;
 
 pub fn run() -> anyhow::Result<()> {
-    git::run_git(&["init", "--initial-branch=main"])?;
+    let config = load_config()?;
+    
+    git::run_git(&["init", &format!("--initial-branch={}", config.main_branch)])?;
 
     if git::get_output(&["rev-parse", "HEAD"]).is_err() {
         git::run_git(&["commit", "--allow-empty", "-m", "chore: initial wgit commit"])?;
     }
 
-    git::run_git(&["branch", "-M", "main"])?;
+    git::run_git(&["branch", "-M", &config.main_branch])?;
     
     let branches = git::get_output(&["branch", "--format=%(refname:short)"])?;
-    if !branches.lines().any(|b| b.trim() == "develop") {
-        git::run_git(&["branch", "develop"])?;
+    if !branches.lines().any(|b| b.trim() == config.dev_branch) {
+        git::run_git(&["branch", &config.dev_branch])?;
     }
-    git::run_git(&["checkout", "develop"])?;
+    git::run_git(&["checkout", &config.dev_branch])?;
 
-    install_hook()?;
+    install_hook(&config.main_branch, &config.dev_branch)?;
 
-    println!("wgit initialized. 'main' and 'develop' branches are protected.");
+    println!("wgit initialized. '{}' and '{}' branches are protected.", config.main_branch, config.dev_branch);
     Ok(())
 }
 
-fn install_hook() -> anyhow::Result<()> {
+pub fn install_hook(main: &str, dev: &str) -> anyhow::Result<()> {
     let hook_path = std::path::PathBuf::from(".git/hooks/pre-commit");
-    let hook_script = r#"#!/bin/sh
+    let hook_script = format!(r#"#!/bin/sh
 branch="$(git rev-parse --abbrev-ref HEAD)"
-if [ "$branch" = "main" ] || [ "$branch" = "develop" ]; then
+if [ "$branch" = "{}" ] || [ "$branch" = "{}" ]; then
     echo "wgit Error: Direct commits to $branch are forbidden."
     exit 1
 fi
-"#;
+"#, main, dev);
+
     std::fs::write(&hook_path, hook_script)?;
 
     #[cfg(unix)]

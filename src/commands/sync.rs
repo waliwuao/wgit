@@ -18,10 +18,10 @@ pub fn run() -> anyhow::Result<()> {
             .prompt()?
     };
 
-    let remote_main_check = git::get_output(&["ls-remote", "--heads", &remote_name, "main"])?;
-    if !remote_main_check.contains("refs/heads/main") {
-        println!("Detected new remote. Pushing 'main' branch first to ensure it is the default branch...");
-        let _ = git::run_git(&["push", "-u", &remote_name, "main"]);
+    let remote_main_check = git::get_output(&["ls-remote", "--heads", &remote_name, &config.main_branch])?;
+    if !remote_main_check.contains(&format!("refs/heads/{}", config.main_branch)) {
+        println!("Detected new remote. Pushing '{}' branch first to ensure it is the default branch...", config.main_branch);
+        let _ = git::run_git(&["push", "-u", &remote_name, &config.main_branch]);
     }
 
     let current_branch = git::get_output(&["rev-parse", "--abbrev-ref", "HEAD"])?;

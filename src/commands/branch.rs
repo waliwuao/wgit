@@ -1,6 +1,7 @@
 use crate::git;
 use crate::cli::{BranchArgs, BranchAction};
 use crate::utils::{get_theme, run_commit_form};
+use crate::config::load_config;
 use inquire::{Select, Text};
 use colored::Colorize;
 
@@ -59,8 +60,11 @@ fn switch() -> anyhow::Result<()> {
 }
 
 fn delete() -> anyhow::Result<()> {
+    let config = load_config()?;
     let branches = get_branches()?;
-    let filter_branches: Vec<_> = branches.into_iter().filter(|b| b != "main" && b != "develop").collect();
+    let filter_branches: Vec<_> = branches.into_iter()
+        .filter(|b| b != &config.main_branch && b != &config.dev_branch)
+        .collect();
     
     if filter_branches.is_empty() {
         anyhow::bail!("No deletable branches available.");
@@ -90,12 +94,12 @@ fn start() -> anyhow::Result<()> {
 }
 
 fn finish() -> anyhow::Result<()> {
+    let config = load_config()?;
     let current = git::get_output(&["rev-parse", "--abbrev-ref", "HEAD"])?;
-    if current == "main" || current == "develop" {
+    if current == config.main_branch || current == config.dev_branch {
         anyhow::bail!("Cannot finish main or develop branches.");
     }
 
-    // 引导用户输入提交信息，避免弹出 nano
     println!("Preparing merge commit message...");
     let types = vec!["merge", "feat", "fix", "chore", "release", "docs", "style", "refactor", "perf", "test"];
     let commit_type = Select::new("Select merge commit type:", types)
@@ -120,8 +124,7 @@ fn finish() -> anyhow::Result<()> {
     }
 
     if current.starts_with("release/") || current.starts_with("hotfix/") {
-        git::run_git(&["checkout", "main"])?;
-        // 使用 -m 参数传入构建好的消息，防止编辑器弹出
+        git::run_git(&["checkout", &config.main_branch])?;
         git::run_git(&["merge", "--no-ff", &current, "-m", &msg])?;
 
         let tag = Text::new("Enter release tag (e.g., v1.0.0):")
@@ -129,10 +132,10 @@ fn finish() -> anyhow::Result<()> {
             .prompt()?;
         git::run_git(&["tag", &tag])?;
 
-        git::run_git(&["checkout", "develop"])?;
+        git::run_git(&["checkout", &config.dev_branch])?;
         git::run_git(&["merge", "--no-ff", &current, "-m", &msg])?;
     } else {
-        git::run_git(&["checkout", "develop"])?;
+        git::run_git(&["checkout", &config.dev_branch])?;
         git::run_git(&["merge", "--no-ff", &current, "-m", &msg])?;
     }
 

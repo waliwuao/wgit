@@ -3,10 +3,23 @@ use std::collections::HashMap;
 use std::fs;
 use crate::git;
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct WgitConfig {
     pub remotes: HashMap<String, String>,
     pub review_mode: ReviewMode,
+    pub main_branch: String,
+    pub dev_branch: String,
+}
+
+impl Default for WgitConfig {
+    fn default() -> Self {
+        Self {
+            remotes: HashMap::new(),
+            review_mode: ReviewMode::LocalMerge,
+            main_branch: "main".to_string(),
+            dev_branch: "develop".to_string(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Default, PartialEq, Clone)]
