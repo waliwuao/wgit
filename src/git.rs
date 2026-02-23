@@ -37,3 +37,15 @@ pub fn get_output(args: &[&str]) -> Result<String> {
     
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
+
+pub fn is_dirty() -> bool {
+    let out = get_output(&["status", "--porcelain"]).unwrap_or_default();
+    !out.trim().is_empty()
+}
+
+pub fn ensure_clean() -> Result<()> {
+    if is_dirty() {
+        anyhow::bail!("Workspace has uncommitted changes. Please commit or stash them first.");
+    }
+    Ok(())
+}

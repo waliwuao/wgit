@@ -30,12 +30,8 @@ pub enum ReviewMode {
 }
 
 pub fn get_config_path() -> anyhow::Result<std::path::PathBuf> {
-    let root_result = git::get_output(&["rev-parse", "--show-toplevel"]);
-    let root = match root_result {
-        Ok(r) => r,
-        Err(_) => std::env::current_dir()?.to_string_lossy().to_string(),
-    };
-    Ok(std::path::PathBuf::from(root).join(".wgit.json"))
+    let git_dir = git::get_output(&["rev-parse", "--git-dir"])?;
+    Ok(std::path::PathBuf::from(git_dir).join("wgit.json"))
 }
 
 pub fn load_config() -> anyhow::Result<WgitConfig> {
@@ -50,6 +46,9 @@ pub fn load_config() -> anyhow::Result<WgitConfig> {
 
 pub fn save_config(config: &WgitConfig) -> anyhow::Result<()> {
     let path = get_config_path()?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
     let content = serde_json::to_string_pretty(config)?;
     fs::write(path, content)?;
     Ok(())

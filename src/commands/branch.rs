@@ -94,6 +94,8 @@ fn start() -> anyhow::Result<()> {
 }
 
 fn finish() -> anyhow::Result<()> {
+    git::ensure_clean()?;
+    
     let config = load_config()?;
     let current = git::get_output(&["rev-parse", "--abbrev-ref", "HEAD"])?.trim().to_string();
     
@@ -130,7 +132,12 @@ fn finish() -> anyhow::Result<()> {
         git::run_git(&["checkout", &config.main_branch])?;
         git::run_git(&["merge", "--no-ff", &current, "-m", &msg])?;
 
-        let tag = Text::new("Assign version tag (e.g. v1.0.0):")
+        let latest_tag = git::get_output(&["describe", "--tags", "--abbrev=0"])
+            .unwrap_or_else(|_| "No tags found".to_string());
+
+        let tag = Text::new("Assign version tag:")
+            .with_placeholder("e.g. v1.0.0")
+            .with_help_message(&format!("Latest version tag: {}", latest_tag.yellow().bold()))
             .with_render_config(get_theme())
             .prompt()?;
         

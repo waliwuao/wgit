@@ -3,17 +3,37 @@ use crate::utils::get_theme;
 use inquire::MultiSelect;
 
 pub fn run() -> anyhow::Result<()> {
-    let status = git::get_output(&["status", "--porcelain"])?;
-    if status.is_empty() {
+    let output = git::get_output(&["status", "--porcelain", "-z"])?;
+    if output.is_empty() {
         println!("No modified or untracked files.");
         return Ok(());
     }
 
     let mut files = Vec::new();
-    for line in status.lines() {
-        if line.len() > 3 {
-            files.push(line[3..].trim().to_string());
+    let entries: Vec<&str> = output.split('\0').collect();
+    
+    let mut i = 0;
+    while i < entries.len() {
+        let entry = entries[i];
+        if entry.is_empty() {
+            i += 1;
+            continue;
         }
+
+        let status_code = &entry[..2];
+        let path = entry[3..].to_string();
+        
+        files.push(path);
+
+        if status_code.contains('R') {
+            i += 1; 
+        }
+        i += 1;
+    }
+
+    if files.is_empty() {
+        println!("No files to add.");
+        return Ok(());
     }
 
     let selected_files = MultiSelect::new(
