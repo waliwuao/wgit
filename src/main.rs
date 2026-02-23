@@ -52,6 +52,7 @@ fn execute_command(command: SubCommand) -> anyhow::Result<()> {
         SubCommand::Config => commands::config::run(),
         SubCommand::Branch(args) => commands::branch::run(args),
         SubCommand::Commit => commands::commit::run(),
+        SubCommand::Update => commands::update::run(),
         SubCommand::Exit => Ok(()),
     }
 }
@@ -62,10 +63,11 @@ fn interactive_select() -> anyhow::Result<Option<SubCommand>> {
         format!("{:<14} {}", "Init", "Initialize git-flow environment and branch protection".bright_black()),
         format!("{:<14} {}", "Sync", "Synchronize current branch with remote (Pull & Push)".bright_black()),
         format!("{:<14} {}", "Undo", "Revert changes to a specific commit or operation".bright_black()),
-        format!("{:<14} {}", "Exit", "Close wgit assistant".bright_black()),
-        format!("{:<14} {}", "Config", "Manage remote repositories and workflow preferences".bright_black()),
-        format!("{:<14} {}", "Branch", "Manage development lifecycle and branch operations".bright_black()),
         format!("{:<14} {}", "Commit", "Record repository changes with structured messages".bright_black()),
+        format!("{:<14} {}", "Branch", "Manage development lifecycle and branch operations".bright_black()),
+        format!("{:<14} {}", "Config", "Manage remote repositories and workflow preferences".bright_black()),
+        format!("{:<14} {}", "Update", "Check for and install the latest version of wgit".bright_black()),
+        format!("{:<14} {}", "Exit", "Close wgit assistant".bright_black()),
     ];
 
     let choice = Select::new("Wgit Assistant Menu:", options)
@@ -89,6 +91,7 @@ fn interactive_select() -> anyhow::Result<Option<SubCommand>> {
         "Config" => Ok(Some(SubCommand::Config)),
         "Branch" => Ok(Some(SubCommand::Branch(BranchArgs { action: None }))),
         "Commit" => Ok(Some(SubCommand::Commit)),
+        "Update" => Ok(Some(SubCommand::Update)),
         _ => anyhow::bail!("Invalid command selected"),
     }
 }

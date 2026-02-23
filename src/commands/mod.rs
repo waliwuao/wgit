@@ -5,3 +5,4 @@ pub mod sync;
 pub mod branch;
 pub mod undo;
 pub mod config;
+pub mod update;
