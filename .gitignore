@@ -2,3 +2,4 @@ temp/
 target/
 **/*.DS_Store
 info/
+Cargo.lock

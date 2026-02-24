@@ -4,6 +4,7 @@ use crate::utils::{get_theme, run_commit_form};
 use crate::config::load_config;
 use inquire::{Select, Text};
 use colored::Colorize;
+use std::path::Path;
 
 pub fn run(args: BranchArgs) -> anyhow::Result<()> {
     let action = match args.action {
@@ -127,10 +128,24 @@ fn finish() -> anyhow::Result<()> {
 
     println!("\n{}", "── Finishing Branch ────────────────────────────────────────────────────".cyan());
 
+    let perform_merge = |target: &str, message: &str| -> anyhow::Result<()> {
+        println!("{} Merging into {}...", " MERGE ".on_cyan().black(), target);
+        git::run_git(&["checkout", target])?;
+        
+        if let Err(_) = git::run_git(&["merge", "--no-ff", &current, "-m", message]) {
+            git::resolve_interactive(&format!("Merge into {}", target))?;
+            
+            let git_dir = git::get_output(&["rev-parse", "--git-dir"])?;
+            if Path::new(&git_dir).join("MERGE_HEAD").exists() {
+                println!("Completing merge commit...");
+                git::run_git(&["commit", "--no-edit"])?;
+            }
+        }
+        Ok(())
+    };
+
     if current.starts_with("release/") || current.starts_with("hotfix/") {
-        println!("{} Merging into {}...", " 1/3 ".on_cyan().black(), config.main_branch);
-        git::run_git(&["checkout", &config.main_branch])?;
-        git::run_git(&["merge", "--no-ff", &current, "-m", &msg])?;
+        perform_merge(&config.main_branch, &msg)?;
 
         let latest_tag = git::get_output(&["describe", "--tags", "--abbrev=0"])
             .unwrap_or_else(|_| "No tags found".to_string());
@@ -145,17 +160,19 @@ fn finish() -> anyhow::Result<()> {
             git::run_git(&["tag", "-a", tag.trim(), "-m", &msg])?;
         }
 
-        println!("{} Merging into {}...", " 2/3 ".on_cyan().black(), config.dev_branch);
-        git::run_git(&["checkout", &config.dev_branch])?;
-        git::run_git(&["merge", "--no-ff", &current, "-m", &msg])?;
+        perform_merge(&config.dev_branch, &msg)?;
     } else {
-        println!("{} Merging into {}...", " 1/2 ".on_cyan().black(), config.dev_branch);
-        git::run_git(&["checkout", &config.dev_branch])?;
-        git::run_git(&["merge", "--no-ff", &current, "-m", &msg])?;
+        perform_merge(&config.dev_branch, &msg)?;
     }
 
-    let cleanup_step = if current.starts_with("release/") || current.starts_with("hotfix/") { " 3/3 " } else { " 2/2 " };
+    let cleanup_step = " CLEANUP ";
     println!("{} Cleaning up branch...", cleanup_step.on_cyan().black());
+    
+    let active_branch = git::get_output(&["rev-parse", "--abbrev-ref", "HEAD"])?;
+    if active_branch == current {
+        git::run_git(&["checkout", &config.dev_branch])?;
+    }
+
     git::run_git(&["branch", "-d", &current])?;
 
     println!("{}\n", format!("Successfully finished branch: {}", current).green().bold());
