@@ -6,3 +6,4 @@ pub mod branch;
 pub mod undo;
 pub mod config;
 pub mod update;
+pub mod context;

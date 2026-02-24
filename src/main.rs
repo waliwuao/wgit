@@ -53,6 +53,7 @@ fn execute_command(command: SubCommand) -> anyhow::Result<()> {
         SubCommand::Branch(args) => commands::branch::run(args),
         SubCommand::Commit => commands::commit::run(),
         SubCommand::Update => commands::update::run(),
+        SubCommand::Context => commands::context::run(),
         SubCommand::Exit => Ok(()),
     }
 }
@@ -65,6 +66,7 @@ fn interactive_select() -> anyhow::Result<Option<SubCommand>> {
         format!("{:<14} {}", "Undo", "Revert changes to a specific commit or operation".bright_black()),
         format!("{:<14} {}", "Commit", "Record repository changes with structured messages".bright_black()),
         format!("{:<14} {}", "Branch", "Manage development lifecycle and branch operations".bright_black()),
+        format!("{:<14} {}", "Context", "Generate project context (Markdown/JSON) for LLMs".bright_black()),
         format!("{:<14} {}", "Config", "Manage remote repositories and workflow preferences".bright_black()),
         format!("{:<14} {}", "Update", "Check for and install the latest version of wgit".bright_black()),
         format!("{:<14} {}", "Exit", "Close wgit assistant".bright_black()),
@@ -72,7 +74,7 @@ fn interactive_select() -> anyhow::Result<Option<SubCommand>> {
 
     let choice = Select::new("Wgit Assistant Menu:", options)
         .with_render_config(get_theme())
-        .with_page_size(10)
+        .with_page_size(11)
         .prompt_skippable()?;
     
     let choice = match choice {
@@ -92,6 +94,7 @@ fn interactive_select() -> anyhow::Result<Option<SubCommand>> {
         "Branch" => Ok(Some(SubCommand::Branch(BranchArgs { action: None }))),
         "Commit" => Ok(Some(SubCommand::Commit)),
         "Update" => Ok(Some(SubCommand::Update)),
+        "Context" => Ok(Some(SubCommand::Context)),
         _ => anyhow::bail!("Invalid command selected"),
     }
 }

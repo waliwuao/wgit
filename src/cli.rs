@@ -18,6 +18,7 @@ pub enum SubCommand {
     Branch(BranchArgs),
     Commit,
     Update,
+    Context,
 }
 
 #[derive(Parser, Debug)]

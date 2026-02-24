@@ -1,6 +1,6 @@
 [package]
 name = "wgit"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2021"
 
 [dependencies]
@@ -12,3 +12,4 @@ serde_json = "1.0"
 anyhow = "1.0"
 crossterm = "0.27"
 self_update = { version = "0.41", default-features = false, features = ["archive-tar", "archive-zip", "compression-flate2", "rustls"] }
+ignore = "0.4"
