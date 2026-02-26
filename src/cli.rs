@@ -44,11 +44,29 @@ pub struct FopsArgs {
 
 #[derive(Subcommand, Clone, Debug)]
 pub enum FopsAction {
-    Copy { src: String, dest: String },
-    Move { src: String, dest: String },
-    Remove { path: String },
-    Rename { src: String, dest: String },
-    Chmod { path: Option<String> },
-    Size { path: String },
+    Copy {
+        #[arg(num_args = 1..)]
+        paths: Vec<String>,
+    },
+    Move {
+        #[arg(num_args = 1..)]
+        paths: Vec<String>,
+    },
+    Remove {
+        #[arg(num_args = 1..)]
+        paths: Vec<String>,
+    },
+    Rename { 
+        src: Option<String>, 
+        dest: Option<String> 
+    },
+    Chmod {
+        #[arg(num_args = 1..)]
+        paths: Vec<String>,
+    },
+    Size {
+        #[arg(num_args = 1..)]
+        paths: Vec<String>,
+    },
     Netinfo,
 }

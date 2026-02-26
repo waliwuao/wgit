@@ -13,12 +13,69 @@ pub fn run(args: FopsArgs) -> Result<()> {
     };
 
     match action {
-        FopsAction::Copy { src, dest } => copy_path(&src, &dest)?,
-        FopsAction::Move { src, dest } => move_path(&src, &dest)?,
-        FopsAction::Remove { path } => remove_path(&path)?,
-        FopsAction::Rename { src, dest } => rename_path(&src, &dest)?,
-        FopsAction::Chmod { path } => chmod_interactive(path)?,
-        FopsAction::Size { path } => size_path(&path)?,
+        FopsAction::Copy { paths } => {
+            let (srcs, dest) = if paths.is_empty() {
+                let s = prompt_multi_files("Select files/directories to copy (Space: select, Enter: confirm):")?;
+                let d = Text::new("Destination directory path:").with_render_config(get_theme()).prompt()?;
+                (s, d)
+            } else if paths.len() < 2 {
+                anyhow::bail!("Copy requires at least a source and a destination.");
+            } else {
+                let d = paths.last().unwrap().clone();
+                let s = paths[..paths.len()-1].to_vec();
+                (s, d)
+            };
+            copy_paths(&srcs, &dest)?;
+        }
+        FopsAction::Move { paths } => {
+            let (srcs, dest) = if paths.is_empty() {
+                let s = prompt_multi_files("Select files/directories to move (Space: select, Enter: confirm):")?;
+                let d = Text::new("Destination directory path:").with_render_config(get_theme()).prompt()?;
+                (s, d)
+            } else if paths.len() < 2 {
+                anyhow::bail!("Move requires at least a source and a destination.");
+            } else {
+                let d = paths.last().unwrap().clone();
+                let s = paths[..paths.len()-1].to_vec();
+                (s, d)
+            };
+            move_paths(&srcs, &dest)?;
+        }
+        FopsAction::Remove { paths } => {
+            let targets = if paths.is_empty() {
+                prompt_multi_files("Select files/directories to remove (Space: select, Enter: confirm):")?
+            } else {
+                paths
+            };
+            for p in targets { remove_path(&p)?; }
+        }
+        FopsAction::Rename { src, dest } => {
+            let s = match src {
+                Some(p) => p,
+                None => prompt_single_file("Select file/directory to rename:")?
+            };
+            let d = match dest {
+                Some(p) => p,
+                None => Text::new(&format!("New name for '{}':", s)).with_render_config(get_theme()).prompt()?
+            };
+            rename_path(&s, &d)?;
+        }
+        FopsAction::Chmod { paths } => {
+            let targets = if paths.is_empty() {
+                prompt_multi_files("Select files/directories to change permissions (Space: select, Enter: confirm):")?
+            } else {
+                paths
+            };
+            chmod_interactive(targets)?;
+        }
+        FopsAction::Size { paths } => {
+            let targets = if paths.is_empty() {
+                prompt_multi_files("Select files/directories to check size (Space: select, Enter: confirm):")?
+            } else {
+                paths
+            };
+            for p in targets { size_path(&p)?; }
+        }
         FopsAction::Netinfo => netinfo()?,
     }
     Ok(())
@@ -26,12 +83,12 @@ pub fn run(args: FopsArgs) -> Result<()> {
 
 fn interactive_select() -> Result<FopsAction> {
     let actions = vec![
-        format!("{:<14} {}", "Copy", "Copy file or directory".bright_black()),
-        format!("{:<14} {}", "Move", "Move file or directory".bright_black()),
-        format!("{:<14} {}", "Remove", "Delete file or directory".bright_black()),
-        format!("{:<14} {}", "Rename", "Rename file or directory".bright_black()),
-        format!("{:<14} {}", "Chmod", "Change file permissions".bright_black()),
-        format!("{:<14} {}", "Size", "Get size of file or directory".bright_black()),
+        format!("{:<14} {}", "Copy", "Copy file or directory (Batch supported)".bright_black()),
+        format!("{:<14} {}", "Move", "Move file or directory (Batch supported)".bright_black()),
+        format!("{:<14} {}", "Remove", "Delete file or directory (Batch supported)".bright_black()),
+        format!("{:<14} {}", "Rename", "Rename a single file or directory".bright_black()),
+        format!("{:<14} {}", "Chmod", "Change file permissions (Batch supported)".bright_black()),
+        format!("{:<14} {}", "Size", "Get size of file or directory (Batch supported)".bright_black()),
         format!("{:<14} {}", "Netinfo", "Print network interfaces info".bright_black()),
     ];
 
@@ -42,36 +99,54 @@ fn interactive_select() -> Result<FopsAction> {
 
     let cmd_str = choice.split_whitespace().next().unwrap_or("");
     match cmd_str {
-        "Copy" => {
-            let src = Text::new("Source path:").with_render_config(get_theme()).prompt()?;
-            let dest = Text::new("Destination path:").with_render_config(get_theme()).prompt()?;
-            Ok(FopsAction::Copy { src, dest })
-        }
-        "Move" => {
-            let src = Text::new("Source path:").with_render_config(get_theme()).prompt()?;
-            let dest = Text::new("Destination path:").with_render_config(get_theme()).prompt()?;
-            Ok(FopsAction::Move { src, dest })
-        }
-        "Remove" => {
-            let path = Text::new("Target path:").with_render_config(get_theme()).prompt()?;
-            Ok(FopsAction::Remove { path })
-        }
-        "Rename" => {
-            let src = Text::new("Source path:").with_render_config(get_theme()).prompt()?;
-            let dest = Text::new("New name/path:").with_render_config(get_theme()).prompt()?;
-            Ok(FopsAction::Rename { src, dest })
-        }
-        "Chmod" => {
-            let path = Text::new("Target path:").with_render_config(get_theme()).prompt()?;
-            Ok(FopsAction::Chmod { path: Some(path) })
-        }
-        "Size" => {
-            let path = Text::new("Target path:").with_render_config(get_theme()).prompt()?;
-            Ok(FopsAction::Size { path })
-        }
+        "Copy" => Ok(FopsAction::Copy { paths: vec![] }),
+        "Move" => Ok(FopsAction::Move { paths: vec![] }),
+        "Remove" => Ok(FopsAction::Remove { paths: vec![] }),
+        "Rename" => Ok(FopsAction::Rename { src: None, dest: None }),
+        "Chmod" => Ok(FopsAction::Chmod { paths: vec![] }),
+        "Size" => Ok(FopsAction::Size { paths: vec![] }),
         "Netinfo" => Ok(FopsAction::Netinfo),
         _ => anyhow::bail!("Invalid action selected"),
     }
+}
+
+fn get_current_dir_entries() -> Result<Vec<String>> {
+    let mut entries = Vec::new();
+    for entry in fs::read_dir(".")? {
+        let entry = entry?;
+        let path = entry.path();
+        let name = path.strip_prefix(".").unwrap_or(&path).to_string_lossy().into_owned();
+        if name != ".git" { // 隐藏底层的 .git，避免误操作
+            entries.push(name);
+        }
+    }
+    entries.sort();
+    Ok(entries)
+}
+
+fn prompt_multi_files(prompt: &str) -> Result<Vec<String>> {
+    let files = get_current_dir_entries()?;
+    if files.is_empty() {
+        anyhow::bail!("No files found in the current directory.");
+    }
+    let selected = MultiSelect::new(prompt, files)
+        .with_render_config(get_theme())
+        .prompt()?;
+    if selected.is_empty() {
+        anyhow::bail!("No files selected.");
+    }
+    Ok(selected)
+}
+
+fn prompt_single_file(prompt: &str) -> Result<String> {
+    let files = get_current_dir_entries()?;
+    if files.is_empty() {
+        anyhow::bail!("No files found in the current directory.");
+    }
+    let selected = Select::new(prompt, files)
+        .with_render_config(get_theme())
+        .prompt()?;
+    Ok(selected)
 }
 
 fn size_path(path: &str) -> Result<()> {
@@ -117,14 +192,39 @@ fn get_dir_size(path: impl AsRef<Path>) -> Result<u64> {
     Ok(size)
 }
 
-fn copy_path(src: &str, dest: &str) -> Result<()> {
-    let metadata = fs::metadata(src)?;
-    if metadata.is_dir() {
-        copy_dir(src, dest)?;
-    } else {
-        fs::copy(src, dest)?;
+fn copy_paths(srcs: &[String], dest: &str) -> Result<()> {
+    let dest_path = Path::new(dest);
+    let is_multi = srcs.len() > 1;
+
+    if is_multi && !dest_path.exists() {
+        fs::create_dir_all(dest_path)?;
     }
-    println!("{}", format!("Successfully copied {} to {}", src, dest).green());
+
+    for src in srcs {
+        let src_path = Path::new(src);
+        if !src_path.exists() {
+            println!("{}", format!("Source {} does not exist, skipping.", src).red());
+            continue;
+        }
+
+        let target = if is_multi || dest_path.is_dir() {
+            let file_name = src_path.file_name().unwrap();
+            dest_path.join(file_name)
+        } else {
+            dest_path.to_path_buf()
+        };
+
+        let metadata = fs::metadata(&src_path)?;
+        if metadata.is_dir() {
+            copy_dir(&src_path, &target)?;
+        } else {
+            if let Some(parent) = target.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::copy(&src_path, &target)?;
+        }
+        println!("{}", format!("Successfully copied {} to {}", src, target.display()).green());
+    }
     Ok(())
 }
 
@@ -142,9 +242,34 @@ fn copy_dir(src: impl AsRef<Path>, dest: impl AsRef<Path>) -> Result<()> {
     Ok(())
 }
 
-fn move_path(src: &str, dest: &str) -> Result<()> {
-    fs::rename(src, dest)?;
-    println!("{}", format!("Successfully moved {} to {}", src, dest).green());
+fn move_paths(srcs: &[String], dest: &str) -> Result<()> {
+    let dest_path = Path::new(dest);
+    let is_multi = srcs.len() > 1;
+
+    if is_multi && !dest_path.exists() {
+        fs::create_dir_all(dest_path)?;
+    }
+
+    for src in srcs {
+        let src_path = Path::new(src);
+        if !src_path.exists() {
+            println!("{}", format!("Source {} does not exist, skipping.", src).red());
+            continue;
+        }
+
+        let target = if is_multi || dest_path.is_dir() {
+            let file_name = src_path.file_name().unwrap();
+            dest_path.join(file_name)
+        } else {
+            dest_path.to_path_buf()
+        };
+
+        if let Some(parent) = target.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::rename(&src_path, &target)?;
+        println!("{}", format!("Successfully moved {} to {}", src, target.display()).green());
+    }
     Ok(())
 }
 
@@ -165,19 +290,13 @@ fn remove_path(path: &str) -> Result<()> {
     Ok(())
 }
 
-fn chmod_interactive(path_arg: Option<String>) -> Result<()> {
-    let path_str = match path_arg {
-        Some(p) => p,
-        None => {
-            Text::new("Enter file/dir path to change permissions:")
-                .with_render_config(get_theme())
-                .prompt()?
-        }
-    };
-
-    let path = Path::new(&path_str);
-    let metadata = fs::metadata(&path)?;
-    let mut perms = metadata.permissions();
+fn chmod_interactive(paths: Vec<String>) -> Result<()> {
+    if paths.is_empty() { return Ok(()); }
+    
+    // 以第一个文件的权限作为勾选的默认值展示
+    let first_path = Path::new(&paths[0]);
+    let metadata = fs::metadata(&first_path)?;
+    let perms = metadata.permissions();
 
     #[cfg(unix)]
     {
@@ -199,7 +318,13 @@ fn chmod_interactive(path_arg: Option<String>) -> Result<()> {
         if mode & 0o002 != 0 { defaults.push(7); }
         if mode & 0o001 != 0 { defaults.push(8); }
 
-        let selection = MultiSelect::new("Select permissions:", options.clone())
+        let prompt_msg = if paths.len() == 1 {
+            format!("Select permissions for '{}':", paths[0])
+        } else {
+            format!("Select permissions for {} files/dirs (Batch apply):", paths.len())
+        };
+
+        let selection = MultiSelect::new(&prompt_msg, options)
             .with_default(&defaults)
             .with_render_config(get_theme())
             .prompt()?;
@@ -219,9 +344,13 @@ fn chmod_interactive(path_arg: Option<String>) -> Result<()> {
                 _ => {}
             }
         }
-        perms.set_mode(new_mode);
-        fs::set_permissions(&path, perms)?;
-        println!("{}", format!("Permissions updated for {}", path_str).green());
+        
+        for p in paths {
+            let mut p_perms = fs::metadata(&p)?.permissions();
+            p_perms.set_mode(new_mode);
+            fs::set_permissions(&p, p_perms)?;
+            println!("{}", format!("Permissions updated for {}", p).green());
+        }
     }
 
     #[cfg(not(unix))]
@@ -232,18 +361,25 @@ fn chmod_interactive(path_arg: Option<String>) -> Result<()> {
             defaults.push(0);
         }
 
-        let selection = MultiSelect::new("Select permissions:", options.clone())
+        let prompt_msg = if paths.len() == 1 {
+            format!("Select permissions for '{}':", paths[0])
+        } else {
+            format!("Select permissions for {} files/dirs (Batch apply):", paths.len())
+        };
+
+        let selection = MultiSelect::new(&prompt_msg, options)
             .with_default(&defaults)
             .with_render_config(get_theme())
             .prompt()?;
 
-        if selection.contains(&"Read-only") {
-            perms.set_readonly(true);
-        } else {
-            perms.set_readonly(false);
+        let set_readonly = selection.contains(&"Read-only");
+
+        for p in paths {
+            let mut p_perms = fs::metadata(&p)?.permissions();
+            p_perms.set_readonly(set_readonly);
+            fs::set_permissions(&p, p_perms)?;
+            println!("{}", format!("Permissions updated for {}", p).green());
         }
-        fs::set_permissions(&path, perms)?;
-        println!("{}", format!("Permissions updated for {}", path_str).green());
     }
 
     Ok(())
