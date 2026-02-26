@@ -5,7 +5,7 @@ mod utils;
 mod commands;
 
 use clap::Parser;
-use cli::{Cli, SubCommand, BranchArgs};
+use cli::{Cli, SubCommand, BranchArgs, FopsArgs};
 use inquire::Select;
 use utils::get_theme;
 use colored::Colorize;
@@ -54,6 +54,7 @@ fn execute_command(command: SubCommand) -> anyhow::Result<()> {
         SubCommand::Commit => commands::commit::run(),
         SubCommand::Update => commands::update::run(),
         SubCommand::Context => commands::context::run(),
+        SubCommand::Fops(args) => commands::fops::run(args),
         SubCommand::Exit => Ok(()),
     }
 }
@@ -69,12 +70,13 @@ fn interactive_select() -> anyhow::Result<Option<SubCommand>> {
         format!("{:<14} {}", "Context", "Generate project context (Markdown/JSON) for LLMs".bright_black()),
         format!("{:<14} {}", "Config", "Manage remote repositories and workflow preferences".bright_black()),
         format!("{:<14} {}", "Update", "Check for and install the latest version of wgit".bright_black()),
+        format!("{:<14} {}", "Fops", "File operations (copy, move, chmod, size, netinfo...)".bright_black()),
         format!("{:<14} {}", "Exit", "Close wgit assistant".bright_black()),
     ];
 
     let choice = Select::new("Wgit Assistant Menu:", options)
         .with_render_config(get_theme())
-        .with_page_size(11)
+        .with_page_size(12)
         .prompt_skippable()?;
     
     let choice = match choice {
@@ -95,6 +97,7 @@ fn interactive_select() -> anyhow::Result<Option<SubCommand>> {
         "Commit" => Ok(Some(SubCommand::Commit)),
         "Update" => Ok(Some(SubCommand::Update)),
         "Context" => Ok(Some(SubCommand::Context)),
+        "Fops" => Ok(Some(SubCommand::Fops(FopsArgs { action: None }))),
         _ => anyhow::bail!("Invalid command selected"),
     }
 }

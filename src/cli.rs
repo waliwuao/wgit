@@ -19,6 +19,7 @@ pub enum SubCommand {
     Commit,
     Update,
     Context,
+    Fops(FopsArgs),
 }
 
 #[derive(Parser, Debug)]
@@ -33,4 +34,21 @@ pub enum BranchAction {
     Delete,
     Switch,
     Finish,
+}
+
+#[derive(Parser, Debug)]
+pub struct FopsArgs {
+    #[command(subcommand)]
+    pub action: Option<FopsAction>,
+}
+
+#[derive(Subcommand, Clone, Debug)]
+pub enum FopsAction {
+    Copy { src: String, dest: String },
+    Move { src: String, dest: String },
+    Remove { path: String },
+    Rename { src: String, dest: String },
+    Chmod { path: Option<String> },
+    Size { path: String },
+    Netinfo,
 }
