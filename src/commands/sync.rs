@@ -20,32 +20,45 @@ pub fn run() -> Result<()> {
         }
     }
 
-    let upstream = git::upstream_branch(cwd)?;
+    let upstream = git::upstream_remote_and_branch(cwd)?;
     let mut push_remote: Option<String> = None;
 
-    let pull_result = if let Some(ref upstream_name) = upstream {
-        println!("Using upstream branch: {upstream_name}");
-        git::pull_rebase(cwd, None, None)
-    } else {
-        let remotes = git::list_remotes(cwd)?;
-        if remotes.is_empty() {
-            println!("No remote configured. Skipping pull and push.");
-            restore_stash_if_needed(cwd, stashed)?;
-            return Ok(());
+    let pull_result = match &upstream {
+        Some((remote, upstream_branch)) => {
+            println!("Using upstream branch: {remote}/{upstream_branch}");
+            if !git::remote_branch_exists(cwd, remote, upstream_branch)? {
+                println!("Remote branch does not exist yet (e.g. first push). Skipping pull.");
+                Ok(())
+            } else {
+                git::pull_rebase(cwd, None, None)
+            }
         }
-        let labels: Vec<String> = remotes
-            .iter()
-            .map(|remote| format!("{} -> {}", remote.name, remote.url))
-            .collect();
-        let selected = utils::select_one("Select remote for first sync", &labels)?;
-        let Some(index) = selected else {
-            println!("Sync canceled.");
-            restore_stash_if_needed(cwd, stashed)?;
-            return Ok(());
-        };
-        let remote_name = remotes[index].name.clone();
-        push_remote = Some(remote_name.clone());
-        git::pull_rebase(cwd, Some(&remote_name), Some(&branch))
+        None => {
+            let remotes = git::list_remotes(cwd)?;
+            if remotes.is_empty() {
+                println!("No remote configured. Skipping pull and push.");
+                restore_stash_if_needed(cwd, stashed)?;
+                return Ok(());
+            }
+            let labels: Vec<String> = remotes
+                .iter()
+                .map(|r| format!("{} -> {}", r.name, r.url))
+                .collect();
+            let selected = utils::select_one("Select remote for first sync", &labels)?;
+            let Some(index) = selected else {
+                println!("Sync canceled.");
+                restore_stash_if_needed(cwd, stashed)?;
+                return Ok(());
+            };
+            let remote_name = remotes[index].name.clone();
+            push_remote = Some(remote_name.clone());
+            if !git::remote_branch_exists(cwd, &remote_name, &branch)? {
+                println!("Remote branch does not exist yet (e.g. first push). Skipping pull.");
+                Ok(())
+            } else {
+                git::pull_rebase(cwd, Some(&remote_name), Some(&branch))
+            }
+        }
     };
 
     if let Err(error) = pull_result {

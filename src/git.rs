@@ -347,6 +347,36 @@ pub fn has_staged_changes(cwd: &Path) -> Result<bool> {
     Ok(!staged_files(cwd)?.is_empty())
 }
 
+/// Paths that are unmerged (e.g. after merge/rebase conflict).
+pub fn unmerged_files(cwd: &Path) -> Result<Vec<String>> {
+    let entries = working_tree_entries(cwd)?;
+    Ok(entries
+        .into_iter()
+        .filter(|e| e.index_status == 'U' || e.worktree_status == 'U')
+        .map(|e| e.path)
+        .collect())
+}
+
+/// Files in the working tree that still contain conflict markers.
+pub fn files_with_conflict_markers(cwd: &Path) -> Result<Vec<String>> {
+    use std::fs;
+    let paths = stageable_files(cwd)?;
+    let mut with_markers = Vec::new();
+    for path in paths {
+        let full = cwd.join(&path);
+        let Ok(content) = fs::read_to_string(&full) else { continue };
+        if content.contains("<<<<<<<") {
+            with_markers.push(path);
+        }
+    }
+    Ok(with_markers)
+}
+
+pub fn add_all(cwd: &Path) -> Result<()> {
+    run_git_in_dir(&["add", "-A"], cwd)?;
+    Ok(())
+}
+
 pub fn upstream_branch(cwd: &Path) -> Result<Option<String>> {
     let (ok, output) = run_git_allow_fail_in_dir(
         &[
@@ -361,6 +391,25 @@ pub fn upstream_branch(cwd: &Path) -> Result<Option<String>> {
         return Ok(None);
     }
     Ok(Some(output.stdout))
+}
+
+/// Parses upstream ref (e.g. `refs/remotes/origin/main` or `origin/main`) into `(remote, branch)`.
+pub fn upstream_remote_and_branch(cwd: &Path) -> Result<Option<(String, String)>> {
+    let raw = match upstream_branch(cwd)? {
+        Some(s) => s,
+        None => return Ok(None),
+    };
+    let s = raw.trim();
+    let rest = s
+        .strip_prefix("refs/remotes/")
+        .unwrap_or(s);
+    let Some((remote, branch)) = rest.split_once('/') else {
+        return Ok(None);
+    };
+    if remote.is_empty() || branch.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some((remote.to_string(), branch.to_string())))
 }
 
 pub fn default_branch(cwd: &Path) -> Result<String> {

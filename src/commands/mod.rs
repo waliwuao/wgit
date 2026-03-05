@@ -4,6 +4,7 @@ pub mod delete;
 pub mod finish;
 pub mod init;
 pub mod menu;
+pub mod solve;
 pub mod remote;
 pub mod start;
 pub mod switch;
@@ -24,6 +25,7 @@ pub fn dispatch(command: Option<Command>) -> Result<()> {
         Command::Delete => delete::run(),
         Command::Start => start::run(),
         Command::Finish => finish::run(),
+        Command::Solve => solve::run(),
         Command::Remote => remote::run(),
         Command::Switch => switch::run(),
         Command::Undo => undo::run(),

@@ -21,6 +21,8 @@ pub enum Command {
     Start,
     /// Finish current branch and merge into parent.
     Finish,
+    /// After resolving conflicts: check markers, stage all, then commit with guided message.
+    Solve,
     /// Manage remote repositories.
     Remote,
     /// Switch to another branch.

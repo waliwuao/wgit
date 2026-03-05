@@ -54,8 +54,8 @@ pub fn run() -> Result<()> {
             }
             Some(1) => {
                 println!("Resolve conflicts manually, then run:");
-                println!("  git add <files>");
-                println!("  wgit finish");
+                println!("  wgit solve");
+                println!("(solve will check for remaining markers, stage all, and prompt for commit message)");
                 println!("Original git error: {error:#}");
                 return Ok(());
             }
