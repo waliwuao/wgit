@@ -7,6 +7,9 @@ use std::path::{Path, PathBuf};
 
 pub fn run() -> Result<()> {
     let cwd = Path::new(".");
+    println!(
+        "Update workflow: check latest GitHub release, download matching asset, replace binary."
+    );
     let origin_url = git::origin_remote_url(cwd)?.ok_or_else(|| {
         anyhow!("remote.origin.url not found; set origin to enable `wgit update`")
     })?;

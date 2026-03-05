@@ -2,6 +2,7 @@ use anyhow::{Context, Result, anyhow};
 use colored::Colorize;
 use std::path::Path;
 use std::process::Command;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[derive(Debug)]
 pub struct GitOutput {
@@ -27,66 +28,210 @@ pub struct ReflogEntry {
     pub summary: String,
 }
 
+static GIT_STEP_COUNTER: AtomicUsize = AtomicUsize::new(1);
+
+fn next_step_number() -> usize {
+    GIT_STEP_COUNTER.fetch_add(1, Ordering::Relaxed)
+}
+
+fn infer_git_purpose(args: &[&str]) -> String {
+    if args.is_empty() {
+        return "Run git command requested by the workflow.".to_string();
+    }
+
+    if args == ["branch", "--show-current"] {
+        return "Detect current branch to decide follow-up actions.".to_string();
+    }
+    if args == ["status", "--porcelain"] {
+        return "Read concise working tree status for automation checks.".to_string();
+    }
+    if args == ["diff", "--cached", "--name-only"] {
+        return "List staged files before creating a commit.".to_string();
+    }
+    if args.len() >= 2 && args[0] == "checkout" && args[1] == "-b" {
+        return "Create a new branch from current HEAD and switch to it.".to_string();
+    }
+    if args.len() >= 2 && args[0] == "checkout" {
+        return "Switch working branch to the selected target branch.".to_string();
+    }
+    if args.len() >= 2 && args[0] == "merge" && args[1] == "--squash" {
+        return "Collect branch changes as one combined commit.".to_string();
+    }
+    if args.len() >= 2 && args[0] == "commit" && args[1] == "-m" {
+        return "Create a commit with provided commit message.".to_string();
+    }
+    if args.len() >= 2 && args[0] == "commit" && args[1] == "-F" {
+        return "Create a commit from a prepared message file.".to_string();
+    }
+    if args.len() >= 2 && args[0] == "branch" && args[1] == "-d" {
+        return "Delete local branch that has been merged already.".to_string();
+    }
+    if args.len() >= 2 && args[0] == "branch" && args[1] == "-m" {
+        return "Rename branch to align with repository conventions.".to_string();
+    }
+    if args.len() >= 3 && args[0] == "symbolic-ref" && args[1] == "HEAD" {
+        return "Point HEAD to target branch reference (including unborn branch).".to_string();
+    }
+    if args.len() >= 2 && args[0] == "add" {
+        return "Stage selected file changes for the next commit.".to_string();
+    }
+    if args.len() >= 2 && args[0] == "stash" && args[1] == "push" {
+        return "Temporarily save uncommitted changes before sync operations.".to_string();
+    }
+    if args.len() >= 2 && args[0] == "stash" && args[1] == "pop" {
+        return "Restore previously stashed local changes.".to_string();
+    }
+    if args.len() >= 2 && args[0] == "pull" && args[1] == "--rebase" {
+        return "Fetch remote updates and replay local commits on top.".to_string();
+    }
+    if args.len() >= 2 && args[0] == "push" && args[1] == "-u" {
+        return "Push branch and set upstream tracking for future sync.".to_string();
+    }
+    if args[0] == "push" {
+        return "Push local commits to tracked remote branch.".to_string();
+    }
+    if args.len() >= 2 && args[0] == "rebase" && args[1] == "--abort" {
+        return "Cancel current rebase and return to previous state.".to_string();
+    }
+    if args.len() >= 2 && args[0] == "merge" && args[1] == "--abort" {
+        return "Cancel current merge and restore pre-merge state.".to_string();
+    }
+    if args.len() >= 2 && args[0] == "reset" && args[1] == "--hard" {
+        return "Reset index and working tree to target commit (discard local changes)."
+            .to_string();
+    }
+    if args.len() >= 2 && args[0] == "reset" && args[1] == "--soft" {
+        return "Move branch pointer while keeping changes staged.".to_string();
+    }
+    if args.len() >= 2 && args[0] == "log" && args[1] == "--oneline" {
+        return "Show recent commit history for rollback selection.".to_string();
+    }
+    if args.len() >= 2 && args[0] == "reflog" {
+        return "Show branch movement history for operation-based undo.".to_string();
+    }
+    if args.len() >= 2 && args[0] == "tag" && args[1] == "--list" {
+        return "Check whether target tag already exists.".to_string();
+    }
+    if args[0] == "tag" {
+        return "Create a release tag for current commit.".to_string();
+    }
+    if args.len() >= 2 && args[0] == "describe" && args[1] == "--tags" {
+        return "Find latest reachable release tag.".to_string();
+    }
+    if args == ["remote"] {
+        return "List configured remote aliases.".to_string();
+    }
+    if args.len() >= 3 && args[0] == "remote" && args[1] == "add" {
+        return "Add a new remote alias and URL.".to_string();
+    }
+    if args.len() >= 3 && args[0] == "config" && args[1] == "--get" {
+        return "Read repository configuration value.".to_string();
+    }
+    if args.len() >= 3 && args[0] == "rev-parse" && args[1] == "--verify" && args[2] == "HEAD" {
+        return "Check whether repository already has at least one commit.".to_string();
+    }
+    if args.len() >= 4
+        && args[0] == "rev-parse"
+        && args[1] == "--abbrev-ref"
+        && args[2] == "--symbolic-full-name"
+        && args[3] == "@{upstream}"
+    {
+        return "Resolve upstream branch that current branch tracks.".to_string();
+    }
+    if args.len() >= 3 && args[0] == "init" && args[1] == "-b" {
+        return "Initialize a new repository and set default branch name.".to_string();
+    }
+    if args.len() >= 3 && args[0] == "commit" && args[1] == "--allow-empty" {
+        return "Create initial placeholder commit for repository bootstrap.".to_string();
+    }
+    if args.len() >= 3 && args[0] == "branch" && args[1] == "--list" {
+        return "Check whether specific local branch exists.".to_string();
+    }
+    if args.len() >= 3 && args[0] == "branch" && args[1] == "--format" {
+        return "List local branch names for selection.".to_string();
+    }
+    if args.len() >= 3 && args[0] == "check-ref-format" && args[1] == "--branch" {
+        return "Validate branch name against Git reference rules.".to_string();
+    }
+
+    format!(
+        "Run git subcommand `{}` as part of the current workflow.",
+        args[0]
+    )
+}
+
+fn print_block(label: &str, text: &str, is_stderr: bool) {
+    let styled_label = format!("{label}:").truecolor(125, 142, 149);
+    if is_stderr {
+        eprintln!("{styled_label}");
+        for line in text.lines() {
+            eprintln!("{}", format!("  {line}").truecolor(125, 142, 149));
+        }
+    } else {
+        println!("{styled_label}");
+        for line in text.lines() {
+            println!("{}", format!("  {line}").truecolor(251, 224, 195));
+        }
+    }
+}
+
+fn execute_git(args: &[&str], cwd: &Path, allow_fail: bool) -> Result<(bool, GitOutput)> {
+    let command_preview = format!("git {}", args.join(" "));
+    let step = next_step_number();
+    let purpose = infer_git_purpose(args);
+    println!(
+        "{}",
+        format!("[Step {step}] {}", purpose).truecolor(255, 187, 152)
+    );
+    println!(
+        "{}",
+        format!("Command: $ {command_preview}").truecolor(255, 187, 152)
+    );
+
+    let output = Command::new("git")
+        .args(args)
+        .current_dir(cwd)
+        .output()
+        .with_context(|| format!("failed to run git command: $ {command_preview}"))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout)
+        .trim_end_matches(&['\r', '\n'][..])
+        .to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr)
+        .trim_end_matches(&['\r', '\n'][..])
+        .to_string();
+
+    if !stdout.is_empty() {
+        print_block("Output", &stdout, false);
+    }
+    if !stderr.is_empty() {
+        print_block("Git notes", &stderr, true);
+    }
+
+    if output.status.success() {
+        println!("{}", "Result: success".truecolor(125, 142, 149));
+    } else {
+        eprintln!("{}", "Result: failed".truecolor(125, 142, 149));
+    }
+
+    if !output.status.success() && !allow_fail {
+        return Err(anyhow!("git command failed: $ {command_preview}"));
+    }
+
+    Ok((output.status.success(), GitOutput { stdout }))
+}
+
 pub fn run_git(args: &[&str]) -> Result<GitOutput> {
     run_git_in_dir(args, Path::new("."))
 }
 
 pub fn run_git_in_dir(args: &[&str], cwd: &Path) -> Result<GitOutput> {
-    let command_preview = format!("$ git {}", args.join(" "));
-    println!("{}", command_preview.truecolor(255, 187, 152));
-
-    let output = Command::new("git")
-        .args(args)
-        .current_dir(cwd)
-        .output()
-        .with_context(|| format!("failed to run git command: {}", command_preview))?;
-
-    let stdout = String::from_utf8_lossy(&output.stdout)
-        .trim_end_matches(&['\r', '\n'][..])
-        .to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr)
-        .trim_end_matches(&['\r', '\n'][..])
-        .to_string();
-
-    if !stdout.is_empty() {
-        println!("{}", stdout.truecolor(251, 224, 195));
-    }
-    if !stderr.is_empty() {
-        eprintln!("{}", stderr.truecolor(125, 142, 149));
-    }
-
-    if !output.status.success() {
-        return Err(anyhow!("git command failed: {}", command_preview));
-    }
-
-    Ok(GitOutput { stdout })
+    let (_, out) = execute_git(args, cwd, false)?;
+    Ok(out)
 }
 
 pub fn run_git_allow_fail_in_dir(args: &[&str], cwd: &Path) -> Result<(bool, GitOutput)> {
-    let command_preview = format!("$ git {}", args.join(" "));
-    println!("{}", command_preview.truecolor(255, 187, 152));
-
-    let output = Command::new("git")
-        .args(args)
-        .current_dir(cwd)
-        .output()
-        .with_context(|| format!("failed to run git command: {}", command_preview))?;
-
-    let stdout = String::from_utf8_lossy(&output.stdout)
-        .trim_end_matches(&['\r', '\n'][..])
-        .to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr)
-        .trim_end_matches(&['\r', '\n'][..])
-        .to_string();
-
-    if !stdout.is_empty() {
-        println!("{}", stdout.truecolor(251, 224, 195));
-    }
-    if !stderr.is_empty() {
-        eprintln!("{}", stderr.truecolor(125, 142, 149));
-    }
-
-    Ok((output.status.success(), GitOutput { stdout }))
+    execute_git(args, cwd, true)
 }
 
 pub fn is_git_repo(cwd: &Path) -> Result<bool> {
@@ -119,6 +264,11 @@ pub fn branch_exists(cwd: &Path, branch: &str) -> Result<bool> {
     // when HEAD is already bound to that branch (e.g. refs/heads/main).
     let current = current_branch(cwd)?;
     Ok(current.trim() == branch)
+}
+
+pub fn is_valid_branch_ref(cwd: &Path, branch: &str) -> Result<bool> {
+    let (ok, _) = run_git_allow_fail_in_dir(&["check-ref-format", "--branch", branch], cwd)?;
+    Ok(ok)
 }
 
 pub fn list_local_branches(cwd: &Path) -> Result<Vec<String>> {

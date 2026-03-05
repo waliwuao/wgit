@@ -1,9 +1,19 @@
-use crate::{git, utils};
+use crate::{config, git, utils};
 use anyhow::Result;
 use std::path::Path;
 
 pub fn run() -> Result<()> {
     let cwd = Path::new(".");
+    println!("Add workflow: verify branch policy, select changed files, then stage selection.");
+    let current_branch = git::current_branch(cwd)?;
+    if config::is_protected_branch(cwd, &current_branch)? {
+        println!(
+            "Add is not allowed on protected branch `{}`.",
+            current_branch.trim()
+        );
+        return Ok(());
+    }
+
     let files = git::stageable_files(cwd)?;
     if files.is_empty() {
         println!("No changes to stage.");

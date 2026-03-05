@@ -4,6 +4,7 @@ use std::path::Path;
 
 pub fn run() -> Result<()> {
     let cwd = Path::new(".");
+    println!("Switch workflow: list branches, choose target, then checkout selected branch.");
     let current = git::current_branch(cwd)?;
     let mut branches = git::list_local_branches(cwd)?;
     if branches.is_empty() {

@@ -1,4 +1,4 @@
-use crate::{git, utils};
+use crate::{config, git, utils};
 use anyhow::{Context, Result, bail};
 use std::fs;
 use std::path::Path;
@@ -6,6 +6,16 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 pub fn run() -> Result<()> {
     let cwd = Path::new(".");
+    println!("Commit workflow: validate staged changes, draft message, then create commit.");
+    let current_branch = git::current_branch(cwd)?;
+    if config::is_protected_branch(cwd, &current_branch)? {
+        println!(
+            "Commit is not allowed on protected branch `{}`.",
+            current_branch.trim()
+        );
+        return Ok(());
+    }
+
     if !git::has_staged_changes(cwd)? {
         println!("No staged changes found. Run `wgit add` first.");
         return Ok(());

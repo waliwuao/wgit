@@ -317,8 +317,7 @@ pub fn select_one(prompt: &str, options: &[String]) -> Result<Option<usize>> {
                 ])
                 .split(inner);
 
-            let title = Paragraph::new(Line::from(prompt.to_string()))
-                .style(title_style());
+            let title = Paragraph::new(Line::from(prompt.to_string())).style(title_style());
             frame.render_widget(title, chunks[0]);
 
             let search = Paragraph::new(format!(
@@ -448,7 +447,7 @@ pub fn select_many(prompt: &str, options: &[String]) -> Result<Vec<usize>> {
                     .iter()
                     .map(|idx| {
                         let checked = selected.contains(idx);
-                        let marker = if checked { "✓" } else { "□" };
+                        let marker = if checked { "[x]" } else { "[ ]" };
                         let marker_style = if checked {
                             Style::default()
                                 .fg(COLOR_SUCCESS)

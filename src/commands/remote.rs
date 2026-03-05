@@ -4,6 +4,7 @@ use std::path::Path;
 
 pub fn run() -> Result<()> {
     let cwd = Path::new(".");
+    println!("Remote workflow: inspect existing remotes, then optionally add a new alias.");
     let remotes = git::list_remotes(cwd)?;
     if remotes.is_empty() {
         println!("No remote repositories detected.");

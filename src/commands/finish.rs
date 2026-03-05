@@ -4,6 +4,9 @@ use std::path::Path;
 
 pub fn run() -> Result<()> {
     let cwd = Path::new(".");
+    println!(
+        "Finish workflow: detect parent branch, squash-merge current branch, commit, then clean up."
+    );
     let source_branch = git::current_branch(cwd)?;
 
     if source_branch == "main" || source_branch == "master" {
@@ -39,7 +42,12 @@ pub fn run() -> Result<()> {
         match choice {
             Some(0) => {
                 let _ = git::merge_abort(cwd);
-                let _ = git::reset_hard_head(cwd);
+                let should_reset = utils::confirm(
+                    "[Safety Check] Also run `git reset --hard HEAD` to discard conflicted working tree changes?",
+                )?;
+                if should_reset {
+                    let _ = git::reset_hard_head(cwd);
+                }
                 git::checkout_branch(cwd, &source_branch)?;
                 println!("Merge aborted and branch restored.");
                 return Ok(());
@@ -62,8 +70,15 @@ pub fn run() -> Result<()> {
     let draft = utils::edit_commit_message("merge")?;
     let Some(draft) = draft else {
         println!("Merge commit editor canceled.");
-        let _ = git::reset_hard_head(cwd);
-        git::checkout_branch(cwd, &source_branch)?;
+        let should_reset = utils::confirm(
+            "[Safety Check] Discard staged squash changes with `git reset --hard HEAD`?",
+        )?;
+        if should_reset {
+            let _ = git::reset_hard_head(cwd);
+        } else {
+            println!("Keeping current working tree state. Clean it up manually if needed.");
+        }
+        let _ = git::checkout_branch(cwd, &source_branch);
         return Ok(());
     };
     if draft.subject.trim().is_empty() {

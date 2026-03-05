@@ -47,6 +47,14 @@ cargo run -- --help
 - `src/config.rs`: local config bootstrap (`.git/wgit.toml`)
 - `src/utils.rs`: reusable interactive prompt helpers
 
+## Optimization Docs
+
+- `docs/github-flow-gap-analysis.md`: current capability vs GitHub Flow gap analysis
+- `docs/high-risk-command-safety-spec.md`: high-risk command safety and recovery rules
+- `docs/convention-normalization-spec.md`: branch/commit/tag convention normalization
+- `docs/quality-gates-and-test-matrix.md`: minimal test matrix and CI gate recommendations
+- `docs/beginner-github-flow-playbook.md`: scenario-based beginner workflow handbook
+
 ## Development
 
 ```bash

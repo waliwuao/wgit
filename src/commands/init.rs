@@ -4,6 +4,7 @@ use std::path::Path;
 
 pub fn run() -> Result<()> {
     let cwd = Path::new(".");
+    println!("Init workflow: detect repository, standardize default branch, ensure wgit config.");
     let (has_main, has_master) = if git::is_git_repo(cwd)? {
         println!("Git repository detected.");
         let has_main = git::branch_exists(cwd, "main")?;

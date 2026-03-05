@@ -4,6 +4,9 @@ use std::path::Path;
 
 pub fn run() -> Result<()> {
     let cwd = Path::new(".");
+    println!(
+        "Sync workflow: auto-stash local changes if needed, pull --rebase, push, then restore stash."
+    );
     let branch = git::current_branch(cwd)?;
     let mut stashed = false;
 

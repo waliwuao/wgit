@@ -1,9 +1,10 @@
-use crate::{git, utils};
+use crate::{config, git, utils};
 use anyhow::Result;
 use std::path::Path;
 
 pub fn run() -> Result<()> {
     let cwd = Path::new(".");
+    println!("Undo workflow: choose rollback base (commit/reflog) and reset level (soft/hard).");
     let base_types = vec!["by-commit".to_string(), "by-operation".to_string()];
     let level_types = vec!["soft".to_string(), "hard".to_string()];
 
@@ -42,6 +43,10 @@ fn undo_by_commit(cwd: &Path, hard: bool) -> Result<()> {
         return Ok(());
     };
 
+    if hard && !confirm_hard_reset(cwd, hash)? {
+        println!("Undo canceled.");
+        return Ok(());
+    }
     git::reset_to(cwd, hash, hard)?;
     println!(
         "Undo complete: reset {} to commit {}.",
@@ -69,6 +74,10 @@ fn undo_by_operation(cwd: &Path, hard: bool) -> Result<()> {
     };
 
     let target = &reflog[index].hash;
+    if hard && !confirm_hard_reset(cwd, target)? {
+        println!("Undo canceled.");
+        return Ok(());
+    }
     git::reset_to(cwd, target, hard)?;
     println!(
         "Undo complete: reset {} to operation {}.",
@@ -76,4 +85,25 @@ fn undo_by_operation(cwd: &Path, hard: bool) -> Result<()> {
         target
     );
     Ok(())
+}
+
+fn confirm_hard_reset(cwd: &Path, target: &str) -> Result<bool> {
+    println!("[Safety Check] Hard reset will rewrite history and discard local working tree changes.");
+    let confirmed = utils::confirm(&format!(
+        "Continue hard reset to `{target}`?"
+    ))?;
+    if !confirmed {
+        return Ok(false);
+    }
+
+    let cfg = config::load_config(cwd)?;
+    if !cfg.require_double_confirm_for_hard_reset {
+        return Ok(true);
+    }
+
+    let expected = target.chars().take(7).collect::<String>();
+    let typed = utils::input_text(&format!(
+        "[Safety Check] Type `{expected}` to confirm hard reset"
+    ))?;
+    Ok(typed.trim() == expected)
 }
