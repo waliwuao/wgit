@@ -15,6 +15,8 @@ pub enum Command {
     Add,
     /// Commit changes with guided prompts.
     Commit,
+    /// Delete a local branch with safety checks.
+    Delete,
     /// Create a new branch from the current branch.
     Start,
     /// Finish current branch and merge into parent.

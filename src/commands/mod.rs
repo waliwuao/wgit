@@ -1,5 +1,6 @@
 pub mod add;
 pub mod commit;
+pub mod delete;
 pub mod finish;
 pub mod init;
 pub mod menu;
@@ -20,6 +21,7 @@ pub fn dispatch(command: Option<Command>) -> Result<()> {
         Command::Init => init::run(),
         Command::Add => add::run(),
         Command::Commit => commit::run(),
+        Command::Delete => delete::run(),
         Command::Start => start::run(),
         Command::Finish => finish::run(),
         Command::Remote => remote::run(),

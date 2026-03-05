@@ -5,12 +5,13 @@ It reduces command memorization with interactive selections and enforces safer w
 
 ## Features
 
-- Core workflow implemented: `init`, `add`, `commit`, `start`, `switch`, `finish`, `remote`, `undo`, `sync`, `menu`, `update`
+- Core workflow implemented: `init`, `add`, `commit`, `delete`, `start`, `switch`, `finish`, `remote`, `undo`, `sync`, `menu`, `update`
 - `add`: parses `git status --porcelain`, supports searchable multi-select staging
 - `commit`: staged check + commit type selection + structured commit editor
+- `delete`: guided local branch deletion with safe/force mode and optional remote cleanup
 - `start`: guided branch type selection and branch name validation
 - `switch`: searchable local branch list with dirty worktree warning
-- `finish`: detect parent branch, squash merge with conflict options, guided merge message, optional release tag on main
+- `finish`: detect parent branch, squash merge with conflict options, guided merge message, optional release tag on main, and optional remote branch cleanup
 - `remote`: detect remotes and add remote aliases interactively
 - `undo`: reset by commit or reflog operation with soft/hard mode
 - `sync`: auto-stash, pull --rebase, push, and restore stash

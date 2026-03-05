@@ -66,6 +66,9 @@ fn infer_git_purpose(args: &[&str]) -> String {
     if args.len() >= 2 && args[0] == "branch" && args[1] == "-d" {
         return "Delete local branch that has been merged already.".to_string();
     }
+    if args.len() >= 2 && args[0] == "branch" && args[1] == "-D" {
+        return "Force delete local branch even when not fully merged.".to_string();
+    }
     if args.len() >= 2 && args[0] == "branch" && args[1] == "-m" {
         return "Rename branch to align with repository conventions.".to_string();
     }
@@ -86,6 +89,9 @@ fn infer_git_purpose(args: &[&str]) -> String {
     }
     if args.len() >= 2 && args[0] == "push" && args[1] == "-u" {
         return "Push branch and set upstream tracking for future sync.".to_string();
+    }
+    if args.len() >= 3 && args[0] == "push" && args[2] == "--delete" {
+        return "Delete branch from selected remote repository.".to_string();
     }
     if args[0] == "push" {
         return "Push local commits to tracked remote branch.".to_string();
@@ -123,6 +129,9 @@ fn infer_git_purpose(args: &[&str]) -> String {
     }
     if args.len() >= 3 && args[0] == "remote" && args[1] == "add" {
         return "Add a new remote alias and URL.".to_string();
+    }
+    if args.len() >= 3 && args[0] == "ls-remote" && args[1] == "--heads" {
+        return "Check whether branch exists on selected remote.".to_string();
     }
     if args.len() >= 3 && args[0] == "config" && args[1] == "--get" {
         return "Read repository configuration value.".to_string();
@@ -407,9 +416,19 @@ pub fn commit_with_message(cwd: &Path, message: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn delete_branch(cwd: &Path, branch: &str) -> Result<()> {
-    run_git_in_dir(&["branch", "-d", branch], cwd)?;
+pub fn delete_branch_force(cwd: &Path, branch: &str) -> Result<()> {
+    run_git_in_dir(&["branch", "-D", branch], cwd)?;
     Ok(())
+}
+
+pub fn try_delete_branch(cwd: &Path, branch: &str, force: bool) -> Result<bool> {
+    let args = if force {
+        vec!["branch", "-D", branch]
+    } else {
+        vec!["branch", "-d", branch]
+    };
+    let (ok, _) = run_git_allow_fail_in_dir(&args, cwd)?;
+    Ok(ok)
 }
 
 pub fn origin_remote_url(cwd: &Path) -> Result<Option<String>> {
@@ -461,6 +480,16 @@ pub fn remote_exists(cwd: &Path, name: &str) -> Result<bool> {
 
 pub fn add_remote(cwd: &Path, name: &str, url: &str) -> Result<()> {
     run_git_in_dir(&["remote", "add", name, url], cwd)?;
+    Ok(())
+}
+
+pub fn remote_branch_exists(cwd: &Path, remote: &str, branch: &str) -> Result<bool> {
+    let output = run_git_in_dir(&["ls-remote", "--heads", remote, branch], cwd)?;
+    Ok(!output.stdout.trim().is_empty())
+}
+
+pub fn delete_remote_branch(cwd: &Path, remote: &str, branch: &str) -> Result<()> {
+    run_git_in_dir(&["push", remote, "--delete", branch], cwd)?;
     Ok(())
 }
 

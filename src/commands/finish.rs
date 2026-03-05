@@ -125,8 +125,74 @@ pub fn run() -> Result<()> {
         println!("Tag `{new_tag}` created.");
     }
 
-    git::delete_branch(cwd, &source_branch)?;
+    let deleted_local = delete_source_branch(cwd, &source_branch)?;
+    if deleted_local {
+        maybe_delete_remote_branch(cwd, &source_branch)?;
+    }
     println!("Finished `{source_branch}` into `{parent}`.");
+    Ok(())
+}
+
+fn delete_source_branch(cwd: &Path, source_branch: &str) -> Result<bool> {
+    if git::try_delete_branch(cwd, source_branch, false)? {
+        return Ok(true);
+    }
+
+    println!(
+        "Branch `{source_branch}` is not fully merged in Git history (common after squash merge)."
+    );
+    let force = utils::confirm(
+        "[Safety Check] Force delete this local branch with `git branch -D`?",
+    )?;
+    if !force {
+        println!("Branch cleanup skipped. You can remove it later with `wgit delete`.");
+        return Ok(false);
+    }
+
+    let typed = utils::input_text(&format!(
+        "[Safety Check] Type `{source_branch}` to confirm force delete"
+    ))?;
+    if typed.trim() != source_branch {
+        println!("Branch name mismatch. Skip force delete.");
+        return Ok(false);
+    }
+
+    git::delete_branch_force(cwd, source_branch)?;
+    println!("Force deleted `{source_branch}`.");
+    Ok(true)
+}
+
+fn maybe_delete_remote_branch(cwd: &Path, branch: &str) -> Result<()> {
+    let remotes = git::list_remotes(cwd)?;
+    if remotes.is_empty() {
+        return Ok(());
+    }
+
+    let confirmed = utils::confirm(
+        "Remote repositories detected. Delete remote branch too?",
+    )?;
+    if !confirmed {
+        return Ok(());
+    }
+
+    let labels: Vec<String> = remotes
+        .iter()
+        .map(|entry| format!("{} -> {}", entry.name, entry.url))
+        .collect();
+    let selected = utils::select_one("Select remote to delete branch from", &labels)?;
+    let Some(index) = selected else {
+        println!("Remote delete canceled.");
+        return Ok(());
+    };
+    let remote = &remotes[index].name;
+
+    if !git::remote_branch_exists(cwd, remote, branch)? {
+        println!("Remote branch `{remote}/{branch}` does not exist. Skip remote delete.");
+        return Ok(());
+    }
+
+    git::delete_remote_branch(cwd, remote, branch)?;
+    println!("Deleted remote branch `{remote}/{branch}`.");
     Ok(())
 }
 
